@@ -7,10 +7,6 @@ use std::fmt::{Debug, Display};
 use std::process::exit;
 use std::rc::Rc;
 
-// TODO: add else stmt
-// TODO: nicer error messages
-// TODO: add static typing
-
 #[derive(Clone)]
 pub(crate) enum Value {
     Float(f32),
