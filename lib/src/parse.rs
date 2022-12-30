@@ -99,11 +99,13 @@ fn parse_fn(func: Pair<Rule>) -> Result<FnDecl> {
 }
 
 fn parse_if(if_stmt: Pair<Rule>) -> Result<IfStmt> {
-    if_stmt
-        .into_inner()
+    let mut iter = if_stmt.into_inner();
+    let else_block = parse_block(iter.next_back().unwrap())?;
+    let ifs = iter
         .array_chunks()
         .map(|[cond, block]| Ok((parse_expr(cond)?, parse_block(block)?)))
-        .collect()
+        .collect::<Result<_>>()?;
+    Ok(IfStmt(ifs, else_block))
 }
 
 fn parse_expr(expr: Pair<Rule>) -> Result<Expr> {

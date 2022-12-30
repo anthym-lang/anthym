@@ -3,11 +3,12 @@ use crate::env::{Env, SharedEnv};
 use crate::function::*;
 use crate::parse::parse_text;
 use anyhow::{anyhow, bail, Ok, Result};
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::process::exit;
 use std::rc::Rc;
 
-// TODO: add scope
+// TODO: add else stmt
+// TODO: nicer error messages
 // TODO: add static typing
 
 #[derive(Clone)]
@@ -21,16 +22,32 @@ pub(crate) enum Value {
     Nothing,
 }
 
+impl Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Float(fl) => Debug::fmt(&fl, f),
+            Self::Number(n) => Debug::fmt(&n, f),
+            Self::Bool(b) => Debug::fmt(&b, f),
+            Self::Char(c) => Debug::fmt(&c, f),
+            Self::Str(s) => Debug::fmt(&s, f),
+            Self::Fn(_) => {
+                write!(f, "<function>")
+            }
+            Self::Nothing => write!(f, "<nothing>"),
+        }
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Float(fl) => fl.fmt(f),
-            Self::Number(n) => n.fmt(f),
-            Self::Bool(b) => b.fmt(f),
-            Self::Char(c) => c.fmt(f),
-            Self::Str(s) => s.fmt(f),
-            Self::Fn(_func) => {
-                todo!()
+            Self::Float(fl) => Display::fmt(&fl, f),
+            Self::Number(n) => Display::fmt(&n, f),
+            Self::Bool(b) => Display::fmt(&b, f),
+            Self::Char(c) => Display::fmt(&c, f),
+            Self::Str(s) => Display::fmt(&s, f),
+            Self::Fn(_) => {
+                write!(f, "<function>")
             }
             Self::Nothing => write!(f, "<nothing>"),
         }
@@ -74,8 +91,8 @@ fn run_if(if_stmt: IfStmt, env: SharedEnv) -> Result<Value> {
             Result::Ok(_) => Some(Err(anyhow!("not a boolean"))),
             Err(e) => Some(Err(e)),
         })
-        .ok_or_else(|| anyhow!("if statement incomplete"))?
-        .and_then(|block| run_block(block, env.clone()))
+        .unwrap_or(Ok(if_stmt.1))
+        .and_then(|block| run_block(block, env))
 }
 
 fn run_expr(expr: Expr, env: SharedEnv) -> Result<Value> {
@@ -148,7 +165,7 @@ pub fn run_text(raw: &str) -> Result<()> {
             match code {
                 Value::Number(n) => exit(n),
                 Value::Nothing => break,
-                other => bail!("invalid exit code: {other}"),
+                other => bail!("invalid exit code: {other:?}"),
             }
         }
     }

@@ -6,7 +6,7 @@ pub(crate) fn println(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
     if args.len() != 1 {
         bail!("wrong arg count")
     }
-    let arg = args.get(0).expect("what");
+    let arg = args.get(0).unwrap();
 
     #[cfg(not(target_arch = "wasm32"))]
     fn log<S: ToString>(message: S) {

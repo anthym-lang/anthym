@@ -6,9 +6,9 @@
     iterator_try_collect
 )]
 mod ast;
+mod builtins;
 mod env;
 pub mod fmt;
 mod function;
 mod parse;
 pub mod run;
-mod stdlib;

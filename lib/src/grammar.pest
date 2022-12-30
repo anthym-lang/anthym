@@ -23,7 +23,7 @@ var_decl = _{ let_var | mut_var | reassign_var }
     let_var = { "let" ~ ident ~ "=" ~ expr }
     mut_var = { "mut" ~ ident ~ "=" ~ expr }
     reassign_var = { ident ~ "=" ~ expr }
-if_stmt = { "if" ~ expr ~ block ~ ("else" ~ "if" ~ expr ~ block)* }
+if_stmt = { "if" ~ expr ~ block ~ ("else" ~ "if" ~ expr ~ block)* ~ "else" ~ block }
 answer_stmt = { "answer" ~ expr }
 // END STATEMENTS
 
@@ -31,5 +31,5 @@ WHITESPACE = _{ " " | "\t" | NEWLINE }
 block_comment = _{ "-{" ~ (block_comment | !"}-" ~ ANY)* ~ "}-" }
 COMMENT = _{ block_comment | "--" ~ (!NEWLINE ~ ANY) }
 stmt = _{ fn_decl | var_decl | if_stmt | answer_stmt | expr }
-block = { "{" ~ stmt+ ~ "}" }
+block = { "{" ~ stmt* ~ "}" }
 program = { SOI ~ stmt+ ~ EOI }

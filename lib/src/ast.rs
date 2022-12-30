@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::iter::FromIterator;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -15,11 +14,6 @@ pub struct Ident(pub Box<str>);
 impl From<&str> for Ident {
     fn from(value: &str) -> Self {
         Self(value.to_owned().into_boxed_str())
-    }
-}
-impl Display for Ident {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 
@@ -55,12 +49,7 @@ pub enum VarDecl {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct IfStmt(pub Vec<(Expr, Block)>);
-impl FromIterator<(Expr, Block)> for IfStmt {
-    fn from_iter<T: IntoIterator<Item = (Expr, Block)>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
+pub struct IfStmt(pub Vec<(Expr, Block)>, pub Block);
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {

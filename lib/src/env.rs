@@ -1,6 +1,6 @@
 use crate::ast::Ident;
+use crate::builtins::*;
 use crate::run::Value;
-use crate::stdlib::*;
 use anyhow::{anyhow, bail, Result};
 use std::cell::RefCell;
 use std::collections::HashMap;
