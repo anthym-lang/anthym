@@ -1,0 +1,14 @@
+[package]
+name = "lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pest = "2.5"
+pest_derive = "2.5"
+lazy_static = "1.4"
+anyhow = "1.0"
+wasm-bindgen = "0.2"
