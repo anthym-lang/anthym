@@ -1,21 +1,15 @@
 use crate::ast::Ident;
 use crate::builtins::*;
-use crate::run::Value;
+use crate::value::Value;
 use anyhow::{anyhow, bail, Result};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-macro_rules! builtins {
-    [$($name: ident),+] => {
-        HashMap::from([$((stringify!($name).into(), (false, Rc::new(RefCell::new(Value::Fn(Rc::new(Box::new($name)))))))),+])
-    };
-}
-
-pub(crate) type SharedEnv = Rc<RefCell<Env>>;
+pub type SharedEnv = Rc<RefCell<Env>>;
 
 #[derive(Default)]
-pub(crate) struct Env {
+pub struct Env {
     pub values: HashMap<Ident, (bool, Rc<RefCell<Value>>)>,
     parent: Option<SharedEnv>,
 }
@@ -23,7 +17,11 @@ pub(crate) struct Env {
 impl Env {
     pub fn global() -> SharedEnv {
         Rc::new(RefCell::new(Self {
-            values: builtins![println],
+            values: builtins![
+                println: builtin_to_function(println),
+                throw: builtin_to_function(throw),
+                u8: U8
+            ],
             ..Default::default()
         }))
     }
@@ -34,7 +32,7 @@ impl Env {
             None => self
                 .parent
                 .as_ref()
-                .ok_or_else(|| anyhow!("variable not found: {name:?}"))?
+                .ok_or_else(|| anyhow!("`{name}` is not defined"))?
                 .borrow()
                 .get_inner(name),
         }
@@ -49,7 +47,7 @@ impl Env {
             inner.replace(value);
             Ok(())
         } else {
-            bail!("variable `{name:?}` is not mutable")
+            bail!("`{name}` is not mutable")
         }
     }
 

@@ -1,62 +1,74 @@
-use std::iter::FromIterator;
+use std::{borrow::Cow, iter::FromIterator};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Float(f32),
-    Number(i32),
+    Int(i32),
     Bool(bool),
     Char(char),
     Str(String),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Ident(pub Box<str>);
+pub struct Ident(pub Cow<'static, str>);
+
 impl From<&str> for Ident {
     fn from(value: &str) -> Self {
-        Self(value.to_owned().into_boxed_str())
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Type(pub Box<str>);
-impl From<&str> for Type {
-    fn from(value: &str) -> Self {
-        Self(value.to_owned().into_boxed_str())
+        Self(Cow::Owned(value.to_owned()))
     }
 }
 
 impl From<String> for Ident {
     fn from(value: String) -> Self {
-        Self(value.into_boxed_str())
+        Self(Cow::Owned(value))
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FnCall {
+    pub name: Ident,
+    pub args: Vec<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Literal(Literal),
-    FnCall(Ident, Vec<Expr>),
+    FnCall(FnCall),
     Ident(Ident),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FnDecl(pub Ident, pub Vec<(Ident, Type)>, pub Type, pub Block);
+pub struct FnDecl {
+    pub name: Ident,
+    pub args: Vec<(Ident, Ident)>,
+    pub ret: Ident,
+    pub block: Block,
+}
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum VarDecl {
+pub enum Var {
     Let(Ident, Expr),
     Mut(Ident, Expr),
     ReAssign(Ident, Expr),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct IfStmt(pub Vec<(Expr, Block)>, pub Block);
+pub struct If {
+    pub ifs: Vec<(Expr, Block)>,
+    pub else_block: Block,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Answer {
+    pub expr: Expr,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     Fn(FnDecl),
-    Var(VarDecl),
-    If(IfStmt),
-    Answer(Expr),
+    Var(Var),
+    If(If),
+    Answer(Answer),
     Expr(Expr),
 }
 

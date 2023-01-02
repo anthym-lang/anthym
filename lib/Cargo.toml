@@ -7,8 +7,6 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pest = "2.5"
-pest_derive = "2.5"
-lazy_static = "1.4"
 anyhow = "1.0"
 wasm-bindgen = "0.2"
+logos = "0.12.1"

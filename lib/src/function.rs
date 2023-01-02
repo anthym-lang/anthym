@@ -1,13 +1,14 @@
 use crate::ast::{Block, Ident};
 use crate::env::SharedEnv;
-use crate::run::{run_block, Value};
+use crate::run::run_block;
+use crate::value::Value;
 use anyhow::{bail, Ok, Result};
 use std::rc::Rc;
 
-pub(crate) type Function =
+pub type Function =
     Rc<Box<(dyn Fn(Vec<Value>, SharedEnv) -> Result<Value> + Send + Sync + 'static)>>;
 
-pub(crate) struct DynFunc {
+pub struct DynFunc {
     names: Vec<Ident>,
     code: Block,
 }

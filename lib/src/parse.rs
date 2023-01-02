@@ -1,171 +1,268 @@
 use crate::ast::*;
-use anyhow::Result;
-use pest::iterators::Pair;
-use pest::Parser as _;
+use crate::error::{NiceError, Result};
+use crate::lex::lex;
+use crate::token::{SpannedToken, Token};
+use std::collections::VecDeque;
+use std::iter::from_fn;
 
-#[derive(pest_derive::Parser)]
-#[grammar = "grammar.pest"]
-struct Parser;
+pub fn parse_text(source: &str) -> Result<Program> {
+    let mut parser = Parser::new(source)?;
+    parser.program()
+}
 
-fn parse_literal(literal: Pair<Rule>) -> Result<Literal> {
-    fn unescape(string: &str) -> Option<String> {
-        let mut result = String::new();
-        let mut chars = string.chars();
+#[derive(Debug)]
+struct Parser<'a> {
+    source: &'a str,
+    tokens: VecDeque<SpannedToken>,
+}
 
+impl<'a> Parser<'a> {
+    pub fn new(source: &'a str) -> Result<Self> {
+        Ok(Self {
+            source,
+            tokens: lex(source)?.into(),
+        })
+    }
+
+    pub fn program(&mut self) -> Result<Program> {
+        from_fn(|| {
+            if self.current().is_ok() {
+                Some(self.stmt())
+            } else {
+                None
+            }
+        })
+        .collect()
+    }
+
+    fn token(&mut self, token: Token) -> Result<SpannedToken> {
+        self.take()
+            .map_err(|err| err.msg(format!("expected {token:?}, got EOF")))
+            .and_then(|owned| {
+                if owned.token == token {
+                    Ok(owned)
+                } else {
+                    Err(owned.as_error(
+                        self.source,
+                        format!("expected {token:?}, got {other:?}", other = owned.token),
+                    ))
+                }
+            })
+    }
+
+    fn ident(&mut self) -> Result<Ident> {
+        self.take()
+            .map_err(|err| err.msg("expected Ident, got EOF"))
+            .and_then(|owned| match owned.token {
+                Token::Ident(ident) => Ok(ident.into()),
+                ref other => {
+                    Err(owned.as_error(self.source, format!("expected Ident, got {other:?}")))
+                }
+            })
+    }
+
+    fn literal(&mut self) -> Result<Literal> {
+        self.take()
+            .map_err(|err| err.msg("expected literal, got EOF"))
+            .and_then(|owned| match owned.token {
+                Token::FloatLiteral(float) => Ok(Literal::Float(float)),
+                Token::IntLiteral(int) => Ok(Literal::Int(int)),
+                Token::BoolLiteral(bool) => Ok(Literal::Bool(bool)),
+                Token::CharLiteral(ch) => Ok(Literal::Char(ch)),
+                Token::StringLiteral(s) => Ok(Literal::Str(s)),
+                ref other => {
+                    Err(owned.as_error(self.source, format!("expected literal, got {other:?}")))
+                }
+            })
+    }
+
+    fn fn_call(&mut self) -> Result<FnCall> {
+        let name = self.ident()?;
+        let opening = self.token(Token::LParen)?;
+        let mut args = Vec::new();
         loop {
-            match chars.next() {
-                Some('\\') => match chars.next()? {
-                    '"' => result.push('"'),
-                    '\\' => result.push('\\'),
-                    'r' => result.push('\r'),
-                    'n' => result.push('\n'),
-                    't' => result.push('\t'),
-                    '0' => result.push('\0'),
-                    '\'' => result.push('\''),
-                    'x' => {
-                        let string: String = chars.clone().take(2).collect();
-
-                        if string.len() != 2 {
-                            return None;
-                        }
-
-                        for _ in 0..string.len() {
-                            chars.next()?;
-                        }
-
-                        let value = u8::from_str_radix(&string, 16).ok()?;
-
-                        result.push(char::from(value));
-                    }
-                    'u' => {
-                        if chars.next()? != '{' {
-                            return None;
-                        }
-
-                        let string: String = chars.clone().take_while(|c| *c != '}').collect();
-
-                        if string.len() < 2 || 6 < string.len() {
-                            return None;
-                        }
-
-                        for _ in 0..string.len() + 1 {
-                            chars.next()?;
-                        }
-
-                        let value = u32::from_str_radix(&string, 16).ok()?;
-
-                        result.push(char::from_u32(value)?);
-                    }
-                    _ => return None,
-                },
-                Some(c) => result.push(c),
-                None => return Some(result),
-            };
+            if self.current_is_token(Token::RParen).unwrap_or(false) {
+                self.take()?;
+                break Ok(FnCall { name, args });
+            }
+            args.push(self.expr()?);
+            if !self.current_is_token(Token::RParen).map_err(|_| {
+                opening.as_error(self.source, "(while parsing function call) unclosed LParen")
+            })? {
+                self.token(Token::Comma)?;
+            }
         }
     }
 
-    let literal = literal.into_inner().next().unwrap();
-    let string = literal.as_str();
-    Ok(match literal.as_rule() {
-        Rule::number_literal => Literal::Number(string.parse()?),
-        Rule::float_literal => Literal::Float(string.parse()?),
-        Rule::boolean_literal => Literal::Bool(string.parse()?),
-        Rule::char_literal => {
-            Literal::Char(unescape(&string[1..string.len() - 1]).unwrap().parse()?)
+    fn expr(&mut self) -> Result<Expr> {
+        let peek = self
+            .current()
+            .map_err(|err| err.msg("expected expr, found eof"))?;
+        match &peek.token {
+            Token::FloatLiteral(_)
+            | Token::IntLiteral(_)
+            | Token::BoolLiteral(_)
+            | Token::CharLiteral(_)
+            | Token::StringLiteral(_) => self.literal().map(Expr::Literal),
+            Token::Ident(_) => match self.peek(1).ok() {
+                Some(inner) => match inner.token {
+                    Token::LParen => self.fn_call().map(Expr::FnCall),
+                    _ => self.ident().map(Expr::Ident),
+                },
+                _ => self.ident().map(Expr::Ident),
+            },
+            other => Err(peek.as_error(
+                self.source,
+                format!("(while parsing an expression) expected Literal or Ident, found {other:?}"),
+            )),
         }
-        Rule::string_literal => Literal::Str(unescape(&string[1..string.len() - 1]).unwrap()),
-        rule => unreachable!("{rule:?}"),
-    })
-}
+    }
 
-fn parse_ident(ident: Pair<Rule>) -> Result<Ident> {
-    Ok(Ident(ident.as_str().to_owned().into_boxed_str()))
-}
-
-fn parse_type(ty: Pair<Rule>) -> Result<Type> {
-    Ok(Type(ty.as_str().to_owned().into_boxed_str()))
-}
-
-fn parse_fn(func: Pair<Rule>) -> Result<FnDecl> {
-    let mut iter = func.into_inner();
-    let name = parse_ident(iter.next().unwrap())?;
-    let block = parse_block(iter.next_back().unwrap())?;
-    let ret = parse_type(iter.next_back().unwrap())?;
-    let args: Result<_> = iter
-        .array_chunks()
-        .map(|[arg, ty]| Ok((parse_ident(arg)?, parse_type(ty)?)))
-        .collect();
-    Ok(FnDecl(name, args?, ret, block))
-}
-
-fn parse_if(if_stmt: Pair<Rule>) -> Result<IfStmt> {
-    let mut iter = if_stmt.into_inner();
-    let else_block = parse_block(iter.next_back().unwrap())?;
-    let ifs = iter
-        .array_chunks()
-        .map(|[cond, block]| Ok((parse_expr(cond)?, parse_block(block)?)))
-        .collect::<Result<_>>()?;
-    Ok(IfStmt(ifs, else_block))
-}
-
-fn parse_expr(expr: Pair<Rule>) -> Result<Expr> {
-    let inner = expr.into_inner().next().unwrap();
-    Ok(match inner.as_rule() {
-        Rule::literal => Expr::Literal(parse_literal(inner)?),
-        Rule::fn_call => {
-            let mut iter = inner.into_inner();
-            Expr::FnCall(
-                parse_ident(iter.next().unwrap())?,
-                iter.map(parse_expr).collect::<Result<_>>()?,
-            )
+    fn fn_decl(&mut self) -> Result<FnDecl> {
+        self.token(Token::KeywordFn)?;
+        let name = self.ident()?;
+        let opening = self.token(Token::LParen)?;
+        let mut args = Vec::new();
+        loop {
+            if self.current_is_token(Token::RParen).unwrap_or(false) {
+                break;
+            }
+            let arg = self.ident()?;
+            self.token(Token::Colon)?;
+            let ty = self.ident()?;
+            args.push((arg, ty));
+            if !self.current_is_token(Token::RParen).map_err(|_| {
+                opening.as_error(
+                    self.source,
+                    "(while parsing a function declaration) unclosed LParen",
+                )
+            })? {
+                self.token(Token::Comma)?;
+            }
         }
-        Rule::ident => Expr::Ident(parse_ident(inner)?),
-        rule => unreachable!("{rule:?}"),
-    })
-}
+        self.token(Token::RParen)?;
+        self.token(Token::Arrow)?;
+        let ret = self.ident()?;
+        let block = self.block()?;
 
-fn parse_stmt(stmt: Pair<Rule>) -> Result<Stmt> {
-    Ok(match stmt.as_rule() {
-        Rule::fn_decl => Stmt::Fn(parse_fn(stmt)?),
-        Rule::let_var => {
-            let mut iter = stmt.into_inner();
-            Stmt::Var(VarDecl::Let(
-                parse_ident(iter.next().unwrap())?,
-                parse_expr(iter.next().unwrap())?,
-            ))
-        }
-        Rule::mut_var => {
-            let mut iter = stmt.into_inner();
-            Stmt::Var(VarDecl::Mut(
-                parse_ident(iter.next().unwrap())?,
-                parse_expr(iter.next().unwrap())?,
-            ))
-        }
-        Rule::reassign_var => {
-            let mut iter = stmt.into_inner();
-            Stmt::Var(VarDecl::ReAssign(
-                parse_ident(iter.next().unwrap())?,
-                parse_expr(iter.next().unwrap())?,
-            ))
-        }
-        Rule::if_stmt => Stmt::If(parse_if(stmt)?),
-        Rule::answer_stmt => Stmt::Answer(parse_expr(stmt.into_inner().next().unwrap())?),
-        Rule::expr => Stmt::Expr(parse_expr(stmt)?),
-        rule => unreachable!("{rule:?}"),
-    })
-}
+        Ok(FnDecl {
+            name,
+            args,
+            ret,
+            block,
+        })
+    }
 
-fn parse_block(block: Pair<Rule>) -> Result<Block> {
-    block.into_inner().map(parse_stmt).collect()
-}
+    fn var(&mut self) -> Result<Var> {
+        match self
+            .current()
+            .map_err(|err| err.msg("expected variable statement, found EOF"))?
+            .token
+        {
+            Token::KeywordLet => {
+                self.take()?;
+                let name = self.ident()?;
+                self.token(Token::Equals)?;
+                let value = self.expr()?;
+                Ok(Var::Let(name, value))
+            }
+            Token::KeywordMut => {
+                self.take()?;
+                let name = self.ident()?;
+                self.token(Token::Equals)?;
+                let value = self.expr()?;
+                Ok(Var::Mut(name, value))
+            }
+            Token::Ident(_) => {
+                let name = self.ident()?;
+                self.token(Token::Equals)?;
+                let value = self.expr()?;
+                Ok(Var::ReAssign(name, value))
+            }
+            ref other => Err(self.current().unwrap().as_error(self.source, format!("(while parsing variable statement) expected `let`, `mut`, or ident, found {other:?}")))
+        }
+    }
 
-pub fn parse_text(raw: &str) -> Result<Program> {
-    let mut stmts = Parser::parse(Rule::program, raw)?
-        .next()
-        .unwrap()
-        .into_inner();
-    stmts.next_back();
-    stmts.map(parse_stmt).collect()
+    fn if_stmt(&mut self) -> Result<If> {
+        self.token(Token::KeywordIf)?;
+        let mut ifs = vec![(self.expr()?, self.block()?)];
+        loop {
+            self.token(Token::KeywordElse)?;
+            if self.current_is_token(Token::KeywordIf).map_err(|err| {
+                err.msg("(while parsing if statement) expected KeywordIf or block, found EOF")
+            })? {
+                ifs.push((self.expr()?, self.block()?));
+            } else {
+                break Ok(If {
+                    ifs,
+                    else_block: self.block()?,
+                });
+            }
+        }
+    }
+
+    fn answer(&mut self) -> Result<Answer> {
+        self.token(Token::KeywordAnswer)?;
+        Ok(Answer { expr: self.expr()? })
+    }
+
+    fn stmt(&mut self) -> Result<Stmt> {
+        match self
+            .current()
+            .map_err(|err| {
+                err.msg(
+                    "(while parsing statment) expected an if statement, a function declaration, a variable statement, or an expression, found EOF",
+                )
+            })?
+            .token
+        {
+            Token::KeywordIf => self.if_stmt().map(Stmt::If),
+            Token::KeywordFn => self.fn_decl().map(Stmt::Fn),
+            Token::KeywordLet | Token::KeywordMut => self.var().map(Stmt::Var),
+            Token::Ident(_) if self.peek_is_token(1, Token::Equals)? => self.var().map(Stmt::Var),
+            Token::KeywordAnswer => self.answer().map(Stmt::Answer),
+            _ => self.expr().map(Stmt::Expr),
+        }
+    }
+
+    fn block(&mut self) -> Result<Block> {
+        let opening = self.token(Token::LBrace)?;
+        let mut stmts = Vec::new();
+        while !self
+            .current_is_token(Token::RBrace)
+            .map_err(|_| opening.as_error(self.source, "(while parsing block) unclosed LBrace"))?
+        {
+            stmts.push(self.stmt()?);
+        }
+        self.token(Token::RBrace)?;
+        Ok(Block(stmts))
+    }
+
+    fn take(&mut self) -> Result<SpannedToken> {
+        self.tokens
+            .pop_front()
+            .ok_or_else(|| NiceError::eof(self.source, "unexpected EOF"))
+    }
+
+    fn current(&self) -> Result<&SpannedToken> {
+        self.tokens
+            .get(0)
+            .ok_or_else(|| NiceError::eof(self.source, "unexpected EOF"))
+    }
+
+    fn current_is_token(&self, token: Token) -> Result<bool> {
+        self.current().map(|inner| inner.token == token)
+    }
+
+    fn peek(&self, n: usize) -> Result<&SpannedToken> {
+        self.tokens
+            .get(n)
+            .ok_or_else(|| NiceError::eof(self.source, "unexpected EOF"))
+    }
+
+    fn peek_is_token(&self, n: usize, token: Token) -> Result<bool> {
+        self.peek(n).map(|inner| inner.token == token)
+    }
 }
 
 #[cfg(test)]
@@ -175,7 +272,7 @@ mod test {
     #[test]
     fn test_parser() {
         let program = r#"
-fn a() -> Nothing {
+fn a(r: int) -> nothing {
     mut x = 1
     x = 2
     answer x
@@ -191,29 +288,28 @@ let u = '\n'
         assert_eq!(
             ast.unwrap(),
             Program(vec![
-                Stmt::Fn(FnDecl(
-                    "a".into(),
-                    Vec::new(),
-                    "Nothing".into(),
-                    Block(vec![
-                        Stmt::Var(VarDecl::Mut("x".into(), Expr::Literal(Literal::Number(1)))),
-                        Stmt::Var(VarDecl::ReAssign(
-                            "x".into(),
-                            Expr::Literal(Literal::Number(2))
-                        )),
-                        Stmt::Answer(Expr::Ident("x".into()))
+                Stmt::Fn(FnDecl {
+                    name: "a".into(),
+                    args: vec![("r".into(), "int".into())],
+                    ret: "nothing".into(),
+                    block: Block(vec![
+                        Stmt::Var(Var::Mut("x".into(), Expr::Literal(Literal::Int(1)))),
+                        Stmt::Var(Var::ReAssign("x".into(), Expr::Literal(Literal::Int(2)))),
+                        Stmt::Answer(Answer {
+                            expr: Expr::Ident("x".into())
+                        })
                     ],)
-                )),
-                Stmt::Var(VarDecl::Let(
+                }),
+                Stmt::Var(Var::Let(
                     "r".into(),
                     Expr::Literal(Literal::Str("hello".into()))
                 )),
-                Stmt::Var(VarDecl::Let(
+                Stmt::Var(Var::Let(
                     "s".into(),
                     Expr::Literal(Literal::Str("hello\n".into()))
                 )),
-                Stmt::Var(VarDecl::Let("t".into(), Expr::Literal(Literal::Char('a')))),
-                Stmt::Var(VarDecl::Let("u".into(), Expr::Literal(Literal::Char('\n'))))
+                Stmt::Var(Var::Let("t".into(), Expr::Literal(Literal::Char('a')))),
+                Stmt::Var(Var::Let("u".into(), Expr::Literal(Literal::Char('\n'))))
             ])
         );
     }
