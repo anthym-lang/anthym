@@ -104,7 +104,7 @@ pub enum Token {
     Error,
 }
 
-fn unescape(lex: &mut Lexer<Token>) -> Option<String> {
+fn unescape(lex: &mut Lexer<'_, Token>) -> Option<String> {
     let mut result = String::new();
     let slice = lex.slice();
     let mut chars = slice.chars().skip(1).take(slice.len() - 2);
@@ -161,7 +161,7 @@ fn unescape(lex: &mut Lexer<Token>) -> Option<String> {
     }
 }
 
-fn parse<T, E>(lex: &mut Lexer<Token>) -> Result<T, E>
+fn parse<T, E>(lex: &mut Lexer<'_, Token>) -> Result<T, E>
 where
     T: FromStr<Err = E>,
 {
