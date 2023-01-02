@@ -1,10 +1,4 @@
-#![feature(
-    iter_array_chunks,
-    unboxed_closures,
-    fn_traits,
-    try_find,
-    iterator_try_collect
-)]
+#![feature(unboxed_closures, fn_traits)]
 mod ast;
 mod builtins;
 mod env;

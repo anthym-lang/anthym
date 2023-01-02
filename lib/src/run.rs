@@ -56,8 +56,8 @@ fn run_fn_call(call: FnCall, env: SharedEnv) -> Result<Value> {
                 call.args
                     .into_iter()
                     .map(|expr| run_expr(expr, child.clone()))
-                    .try_collect()?,
-                child.clone(),
+                    .collect::<Result<_>>()?,
+                child,
             )
         }
         _ => bail!("`{name}` is not a function", name = call.name),
