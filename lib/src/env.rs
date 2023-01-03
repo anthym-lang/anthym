@@ -6,16 +6,16 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub type SharedEnv = Rc<RefCell<Env>>;
+pub(crate) type SharedEnv = Rc<RefCell<Env>>;
 
 #[derive(Default)]
-pub struct Env {
-    pub values: HashMap<Ident, (bool, Rc<RefCell<Value>>)>,
+pub(crate) struct Env {
+    pub(crate) values: HashMap<Ident, (bool, Rc<RefCell<Value>>)>,
     parent: Option<SharedEnv>,
 }
 
 impl Env {
-    pub fn global() -> SharedEnv {
+    pub(crate) fn global() -> SharedEnv {
         Rc::new(RefCell::new(Self {
             values: builtins![
                 println: builtin_to_function(println),
@@ -38,11 +38,11 @@ impl Env {
         }
     }
 
-    pub fn get(&self, name: &Ident) -> Result<Value> {
+    pub(crate) fn get(&self, name: &Ident) -> Result<Value> {
         self.get_inner(name).map(|x| x.1.borrow().clone())
     }
 
-    pub fn reassign(&self, name: &Ident, value: Value) -> Result<()> {
+    pub(crate) fn reassign(&self, name: &Ident, value: Value) -> Result<()> {
         if let (true, inner) = self.get_inner(name)? {
             inner.replace(value);
             Ok(())
@@ -51,13 +51,13 @@ impl Env {
         }
     }
 
-    pub fn set(&mut self, mutable: bool, name: Ident, value: Value) -> Result<()> {
+    pub(crate) fn set(&mut self, mutable: bool, name: Ident, value: Value) -> Result<()> {
         self.values
             .insert(name, (mutable, Rc::new(RefCell::new(value))));
         Ok(())
     }
 
-    pub fn new_child_scope(this: &SharedEnv) -> SharedEnv {
+    pub(crate) fn new_child_scope(this: &SharedEnv) -> SharedEnv {
         Rc::new(RefCell::new(Self {
             parent: Some(Rc::clone(this)),
             ..Default::default()

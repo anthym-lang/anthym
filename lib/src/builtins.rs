@@ -6,7 +6,7 @@ use anyhow::{bail, Result};
 use std::borrow::Cow;
 use std::rc::Rc;
 
-pub fn builtin_to_function(builtin: fn(Vec<Value>, SharedEnv) -> Result<Value>) -> Function {
+pub(crate) fn builtin_to_function(builtin: fn(Vec<Value>, SharedEnv) -> Result<Value>) -> Function {
     Rc::new(Box::new(builtin))
 }
 
@@ -18,11 +18,13 @@ macro_rules! builtins {
 
 pub(crate) use builtins;
 
-pub fn println(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
+pub(crate) fn println(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
     if args.len() != 1 {
         bail!("wrong arg count")
     }
-    let arg = args.get(0).unwrap();
+
+    // SAFETY: we just checked that the argument length == 1
+    let arg = unsafe { args.get(0).unwrap_unchecked() };
 
     #[cfg(not(target_arch = "wasm32"))]
     fn log<S: ToString>(message: S) {
@@ -41,13 +43,14 @@ pub fn println(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
     Ok(Value::Nothing)
 }
 
-pub fn throw(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
+pub(crate) fn throw(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
     if args.len() != 1 {
         bail!("wrong arg count")
     }
 
-    let arg = args.get(0).unwrap();
+    // SAFETY: we just checked that the argument length == 1
+    let arg = unsafe { args.get(0).unwrap_unchecked() };
     bail!("{arg}")
 }
 
-pub const U8: Ident = Ident(Cow::Borrowed("u8"));
+pub(crate) const U8: Ident = Ident(Cow::Borrowed("u8"));

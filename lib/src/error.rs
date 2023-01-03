@@ -2,20 +2,20 @@ use std::error::Error;
 use std::fmt::Display;
 use std::iter::repeat;
 use std::ops::Range;
-pub type Result<T> = std::result::Result<T, NiceError>;
+pub(crate) type Result<T> = std::result::Result<T, NiceError>;
 
 #[derive(Debug, PartialEq)]
-pub struct NiceError {
-    pub message: String,
-    pub line_str: String,
-    pub line_num: usize,
-    pub span: Range<usize>,
+pub(crate) struct NiceError {
+    pub(crate) message: String,
+    pub(crate) line_str: String,
+    pub(crate) line_num: usize,
+    pub(crate) span: Range<usize>,
 }
 
 impl NiceError {
-    pub fn eof(source: &str, message: impl Into<String>) -> Self {
+    pub(crate) fn eof(source: &str, message: impl Into<String>) -> Self {
         let mut lines = source.lines();
-        let line_str = lines.next_back().unwrap();
+        let line_str = lines.next_back().unwrap_or_default();
         Self {
             message: message.into(),
             line_str: line_str.into(),
@@ -27,7 +27,7 @@ impl NiceError {
         }
     }
 
-    pub fn msg(mut self, new: impl Into<String>) -> Self {
+    pub(crate) fn msg(mut self, new: impl Into<String>) -> Self {
         self.message = new.into();
         self
     }

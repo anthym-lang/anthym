@@ -2,7 +2,7 @@ use crate::error::Result;
 use crate::token::{SpannedToken, Token};
 use logos::Logos;
 
-pub fn lex(input: &str) -> Result<Vec<SpannedToken>> {
+pub(crate) fn lex(input: &str) -> Result<Vec<SpannedToken>> {
     Token::lexer(input)
         .spanned()
         .map(|token| {

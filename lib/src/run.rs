@@ -4,6 +4,7 @@ use crate::function::*;
 use crate::parse::parse_text;
 use crate::value::Value;
 use anyhow::{anyhow, bail, Ok, Result};
+use std::iter::once;
 use std::process::exit;
 use std::rc::Rc;
 
@@ -35,8 +36,8 @@ fn run_fn_decl(fn_decl: FnDecl, env: SharedEnv) -> Result<Value> {
 }
 
 fn run_if(if_stmt: If, env: SharedEnv) -> Result<Value> {
-    if_stmt
-        .ifs
+    once(if_stmt.if_stmt)
+        .chain(if_stmt.else_ifs)
         .into_iter()
         .find_map(|(cond, block)| match run_expr(cond, env.clone()) {
             Result::Ok(Value::Bool(true)) => Some(Ok(block)),

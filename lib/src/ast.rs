@@ -1,7 +1,7 @@
 use std::{borrow::Cow, iter::FromIterator};
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Literal {
+pub(crate) enum Literal {
     Float(f32),
     Int(i32),
     Bool(bool),
@@ -10,7 +10,7 @@ pub enum Literal {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Ident(pub Cow<'static, str>);
+pub(crate) struct Ident(pub(crate) Cow<'static, str>);
 
 impl From<&str> for Ident {
     fn from(value: &str) -> Self {
@@ -25,46 +25,47 @@ impl From<String> for Ident {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FnCall {
-    pub name: Ident,
-    pub args: Vec<Expr>,
+pub(crate) struct FnCall {
+    pub(crate) name: Ident,
+    pub(crate) args: Vec<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Expr {
+pub(crate) enum Expr {
     Literal(Literal),
     FnCall(FnCall),
     Ident(Ident),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FnDecl {
-    pub name: Ident,
-    pub args: Vec<(Ident, Ident)>,
-    pub ret: Ident,
-    pub block: Block,
+pub(crate) struct FnDecl {
+    pub(crate) name: Ident,
+    pub(crate) args: Vec<(Ident, Ident)>,
+    pub(crate) ret: Ident,
+    pub(crate) block: Block,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Var {
+pub(crate) enum Var {
     Let(Ident, Expr),
     Mut(Ident, Expr),
     ReAssign(Ident, Expr),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct If {
-    pub ifs: Vec<(Expr, Block)>,
-    pub else_block: Block,
+pub(crate) struct If {
+    pub(crate) if_stmt: (Expr, Block),
+    pub(crate) else_ifs: Vec<(Expr, Block)>,
+    pub(crate) else_block: Block,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Answer {
-    pub expr: Expr,
+pub(crate) struct Answer {
+    pub(crate) expr: Expr,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Stmt {
+pub(crate) enum Stmt {
     Fn(FnDecl),
     Var(Var),
     If(If),
@@ -73,7 +74,7 @@ pub enum Stmt {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Block(pub Vec<Stmt>);
+pub(crate) struct Block(pub(crate) Vec<Stmt>);
 impl FromIterator<Stmt> for Block {
     fn from_iter<T: IntoIterator<Item = Stmt>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
@@ -81,7 +82,7 @@ impl FromIterator<Stmt> for Block {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Program(pub Vec<Stmt>);
+pub(crate) struct Program(pub(crate) Vec<Stmt>);
 impl FromIterator<Stmt> for Program {
     fn from_iter<T: IntoIterator<Item = Stmt>>(iter: T) -> Self {
         Self(iter.into_iter().collect())

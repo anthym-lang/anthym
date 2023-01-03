@@ -5,13 +5,13 @@ use std::ops::Range;
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub struct SpannedToken {
-    pub token: Token,
-    pub span: Range<usize>,
+pub(crate) struct SpannedToken {
+    pub(crate) token: Token,
+    pub(crate) span: Range<usize>,
 }
 
 impl SpannedToken {
-    pub fn as_error(&self, source: &str, message: impl Into<String>) -> NiceError {
+    pub(crate) fn as_error(&self, source: &str, message: impl Into<String>) -> NiceError {
         let mut line = 0;
         let mut line_idx = 0;
         for (idx, char) in source.char_indices() {
@@ -27,7 +27,7 @@ impl SpannedToken {
 
         NiceError {
             message: message.into(),
-            line_str: source.lines().nth(line).unwrap().to_owned(),
+            line_str: source.lines().nth(line).unwrap_or_default().to_owned(),
             line_num: line + 1,
             span: Range {
                 start: self.span.start - line_idx,
@@ -38,7 +38,7 @@ impl SpannedToken {
 }
 
 #[derive(Debug, Logos, PartialEq)]
-pub enum Token {
+pub(crate) enum Token {
     #[token("fn")]
     KeywordFn,
 

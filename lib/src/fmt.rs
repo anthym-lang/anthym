@@ -31,7 +31,7 @@ impl Display for FnDecl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            r"
+            "
 fn {name}({args}) -> {ret} {block}
 ",
             name = self.name,
@@ -49,33 +49,21 @@ fn {name}({args}) -> {ret} {block}
 
 impl Display for If {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let if_stmt = &self.if_stmt;
+        let else_ifs = self
+            .else_ifs
+            .iter()
+            .map(|(cond, block)| format!("else if {cond} {block}",))
+            .collect::<Vec<_>>()
+            .join(" ");
         write!(
             f,
-            "{}",
-            if self.ifs.len() > 1 {
-                let mut iter = self.ifs.iter();
-                let first = iter.next().unwrap();
-                let else_ifs = iter
-                    .map(|(cond, block)| format!("else if {cond} {block}",))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                format!(
-                    "
-if {cond} {block} {else_ifs}
+            "
+if {if_cond} {if_block} {else_ifs} else {else_block}
 ",
-                    cond = first.0,
-                    block = first.1,
-                )
-            } else {
-                let if_stmt = self.ifs.first().unwrap();
-                format!(
-                    "
-if {cond} {block}
-",
-                    cond = if_stmt.0,
-                    block = if_stmt.1,
-                )
-            }
+            if_cond = if_stmt.0,
+            if_block = if_stmt.1,
+            else_block = self.else_block
         )
     }
 }
@@ -198,8 +186,10 @@ fn a() -> nothing {
     x = 2
 }";
         let formatted = format_text(program_ugly);
-        assert!(formatted.is_ok());
-        assert_eq!(formatted.unwrap(), program.trim().to_owned());
+        assert_eq!(
+            formatted.map_err(|err| err.to_string()),
+            Ok(program.trim().to_owned())
+        );
     }
 
     #[test]
@@ -215,10 +205,11 @@ x   =2
 }
     ";
         let formatted = format_text(program_ugly);
-        assert!(formatted.is_ok());
         assert_eq!(
-            parse_text(program_ugly).unwrap(),
-            parse_text(&formatted.unwrap()).unwrap()
+            parse_text(program_ugly).map_err(|err| err.to_string()),
+            formatted
+                .and_then(parse_text)
+                .map_err(|err| err.to_string())
         );
     }
 }

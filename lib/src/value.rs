@@ -15,7 +15,7 @@ macro_rules! generate_from_impls {
 }
 
 #[derive(Clone)]
-pub enum Value {
+pub(crate) enum Value {
     Float(f32),
     Number(i32),
     Bool(bool),

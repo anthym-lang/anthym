@@ -5,16 +5,16 @@ use crate::value::Value;
 use anyhow::{bail, Ok, Result};
 use std::rc::Rc;
 
-pub type Function =
+pub(crate) type Function =
     Rc<Box<(dyn Fn(Vec<Value>, SharedEnv) -> Result<Value> + Send + Sync + 'static)>>;
 
-pub struct DynFunc {
+pub(crate) struct DynFunc {
     names: Vec<Ident>,
     code: Block,
 }
 
 impl DynFunc {
-    pub fn new(names: Vec<Ident>, code: Block) -> Self {
+    pub(crate) fn new(names: Vec<Ident>, code: Block) -> Self {
         Self { names, code }
     }
 }

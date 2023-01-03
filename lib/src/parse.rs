@@ -5,9 +5,9 @@ use crate::token::{SpannedToken, Token};
 use std::collections::VecDeque;
 use std::iter::from_fn;
 
-pub fn parse_text(source: &str) -> Result<Program> {
-    let mut parser = Parser::new(source)?;
-    parser.program()
+pub(crate) fn parse_text(source: impl AsRef<str>) -> anyhow::Result<Program> {
+    let mut parser = Parser::new(source.as_ref())?;
+    Ok(parser.program()?)
 }
 
 #[derive(Debug)]
@@ -17,14 +17,14 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str) -> Result<Self> {
+    pub(crate) fn new(source: &'a str) -> Result<Self> {
         Ok(Self {
             source,
             tokens: lex(source)?.into(),
         })
     }
 
-    pub fn program(&mut self) -> Result<Program> {
+    pub(crate) fn program(&mut self) -> Result<Program> {
         from_fn(|| {
             if self.current().is_ok() {
                 Some(self.stmt())
@@ -154,9 +154,9 @@ impl<'a> Parser<'a> {
     }
 
     fn var(&mut self) -> Result<Var> {
-        match self
-            .current()
-            .map_err(|err| err.msg("expected variable statement, found EOF"))?
+        let current = self.current()
+            .map_err(|err| err.msg("expected variable statement, found EOF"))?;
+        match current 
             .token
         {
             Token::KeywordLet => {
@@ -179,22 +179,24 @@ impl<'a> Parser<'a> {
                 let value = self.expr()?;
                 Ok(Var::ReAssign(name, value))
             }
-            ref other => Err(self.current().unwrap().as_error(self.source, format!("(while parsing variable statement) expected `let`, `mut`, or ident, found {other:?}")))
+            ref other => Err(current.as_error(self.source, format!("(while parsing variable statement) expected `let`, `mut`, or ident, found {other:?}")))
         }
     }
 
     fn if_stmt(&mut self) -> Result<If> {
         self.token(Token::KeywordIf)?;
-        let mut ifs = vec![(self.expr()?, self.block()?)];
+        let if_stmt = (self.expr()?, self.block()?);
+        let mut else_ifs = Vec::new();
         loop {
             self.token(Token::KeywordElse)?;
             if self.current_is_token(Token::KeywordIf).map_err(|err| {
                 err.msg("(while parsing if statement) expected KeywordIf or block, found EOF")
             })? {
-                ifs.push((self.expr()?, self.block()?));
+                else_ifs.push((self.expr()?, self.block()?));
             } else {
                 break Ok(If {
-                    ifs,
+                    if_stmt,
+                    else_ifs,
                     else_block: self.block()?,
                 });
             }
@@ -284,10 +286,9 @@ let t = 'a'
 let u = '\n'
 "#;
         let ast = parse_text(program);
-        assert!(ast.is_ok());
         assert_eq!(
-            ast.unwrap(),
-            Program(vec![
+            ast.map_err(|err| err.to_string()),
+            Ok(Program(vec![
                 Stmt::Fn(FnDecl {
                     name: "a".into(),
                     args: vec![("r".into(), "int".into())],
@@ -311,6 +312,6 @@ let u = '\n'
                 Stmt::Var(Var::Let("t".into(), Expr::Literal(Literal::Char('a')))),
                 Stmt::Var(Var::Let("u".into(), Expr::Literal(Literal::Char('\n'))))
             ])
-        );
+        ));
     }
 }
