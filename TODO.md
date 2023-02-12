@@ -1,7 +1,7 @@
-# TODO
- * Generate parser error messages, maybe with macro?
- * Nicer error messages by storing info in AST (+ custom error type and macros)
- * Rewrite evaluator
+# TODO:
+Emphasized = currently working on
+
+## Features
  * Binary expressions
  * Static typing
  * More builtins
@@ -9,3 +9,10 @@
  * Compile to bytecode
  * Optimize bytecode
  * JIT w/ bytecode?????
+
+## Refactors
+* ***Generate parser error messages, maybe with macro?***
+* Stop using anyhow, switch to thiserror
+* Rewrite evaluator, maybe with register machine
+* Merge error types for nicer handling
+* Nicer error messages by storing info in AST (+ custom error type and macros)

@@ -1,9 +1,7 @@
-use crate::ast::Ident;
 use crate::env::SharedEnv;
 use crate::function::Function;
 use crate::value::Value;
 use anyhow::{bail, Result};
-use std::borrow::Cow;
 use std::rc::Rc;
 
 pub(crate) fn builtin_to_function(builtin: fn(Vec<Value>, SharedEnv) -> Result<Value>) -> Function {
@@ -38,7 +36,7 @@ pub(crate) fn println(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
         fn log(s: &str);
     }
 
-    log(arg.to_string());
+    log(arg.to_string().as_str());
 
     Ok(Value::Nothing)
 }
@@ -52,5 +50,3 @@ pub(crate) fn throw(args: Vec<Value>, _env: SharedEnv) -> Result<Value> {
     let arg = unsafe { args.get(0).unwrap_unchecked() };
     bail!("{arg}")
 }
-
-pub(crate) const U8: Ident = Ident(Cow::Borrowed("u8"));

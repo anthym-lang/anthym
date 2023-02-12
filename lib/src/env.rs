@@ -19,8 +19,7 @@ impl Env {
         Rc::new(RefCell::new(Self {
             values: builtins![
                 println: builtin_to_function(println),
-                throw: builtin_to_function(throw),
-                u8: U8
+                throw: builtin_to_function(throw)
             ],
             ..Default::default()
         }))
