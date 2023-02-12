@@ -1,0 +1,8 @@
+fn print_arg(arg: int) -> nothing {
+    println("Printing stuff...")
+    println(arg)
+}
+
+let thing = 1
+print_arg(thing)
+thing

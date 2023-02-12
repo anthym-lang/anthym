@@ -100,7 +100,7 @@ impl Display for Expr {
 
 impl Display for Answer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.expr)
+        write!(f, "answer {}", self.expr)
     }
 }
 
