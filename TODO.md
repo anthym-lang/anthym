@@ -8,7 +8,7 @@ Emphasized = currently working on
  * Test WASM-ness
  * Compile to bytecode
  * Optimize bytecode
- * JIT w/ bytecode?????
+ * **JIT / compile to binary & link with cranelift**
 
 ## Refactors
 * Stop using anyhow, switch to thiserror
