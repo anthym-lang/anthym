@@ -98,9 +98,9 @@ impl Display for Expr {
     }
 }
 
-impl Display for Answer {
+impl Display for Return {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "answer {}", self.expr)
+        write!(f, "return {}", self.expr)
     }
 }
 
@@ -117,7 +117,7 @@ impl Display for Stmt {
                 },
                 Stmt::Fn(decl) => decl.to_string(),
                 Stmt::If(if_stmt) => if_stmt.to_string(),
-                Stmt::Answer(answer) => answer.to_string(),
+                Stmt::Return(return_) => return_.to_string(),
                 Stmt::Expr(expr) => expr.to_string(),
             }
         )

@@ -60,7 +60,7 @@ pub(crate) struct If {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Answer {
+pub(crate) struct Return {
     pub(crate) expr: Expr,
 }
 
@@ -69,7 +69,7 @@ pub(crate) enum Stmt {
     Fn(FnDecl),
     Var(Var),
     If(If),
-    Answer(Answer),
+    Return(Return),
     Expr(Expr),
 }
 

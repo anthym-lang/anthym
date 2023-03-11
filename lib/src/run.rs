@@ -95,7 +95,7 @@ fn run_stmt(stmt: Stmt, env: SharedEnv) -> Result<Option<Value>> {
                 env.borrow_mut().reassign(&name, res)?;
             }
         },
-        Stmt::Answer(answer) => return Ok(Some(run_expr(answer.expr, env)?)),
+        Stmt::Return(return_) => return Ok(Some(run_expr(return_.expr, env)?)),
         Stmt::Expr(expr) => {
             run_expr(expr, env)?;
         }

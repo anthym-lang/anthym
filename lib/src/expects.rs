@@ -57,6 +57,6 @@ pub(crate) const VAR: [TokenType; 3] = [
     TokenType::Ident,
 ];
 pub(crate) const IF_STMT: [TokenType; 1] = [TokenType::KeywordIf];
-pub(crate) const ANSWER: [TokenType; 1] = [TokenType::KeywordAnswer];
-pub(crate) const STMT: [TokenType; 12] = concat_array!(IF_STMT, FN_DECL, VAR, ANSWER, EXPR);
+pub(crate) const RETURN: [TokenType; 1] = [TokenType::KeywordReturn];
+pub(crate) const STMT: [TokenType; 12] = concat_array!(IF_STMT, FN_DECL, VAR, RETURN, EXPR);
 // pub(crate) const BLOCK: [TokenType; 1] = [TokenType::LBrace];

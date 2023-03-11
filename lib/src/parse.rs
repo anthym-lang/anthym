@@ -239,9 +239,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn answer(&mut self) -> Result<Answer> {
-        self.token(TokenType::KeywordAnswer)?;
-        Ok(Answer { expr: self.expr()? })
+    fn return_(&mut self) -> Result<Return> {
+        self.token(TokenType::KeywordReturn)?;
+        Ok(Return { expr: self.expr()? })
     }
 
     fn stmt(&mut self) -> Result<Stmt> {
@@ -256,7 +256,7 @@ impl<'a> Parser<'a> {
             TokenType::Ident if self.peek_is_token(1, TokenType::Equals).unwrap_or(false) => {
                 self.var().map(Stmt::Var)
             }
-            TokenType::KeywordAnswer => self.answer().map(Stmt::Answer),
+            TokenType::KeywordReturn => self.return_().map(Stmt::Return),
             other if EXPR.contains(&other) => self.expr().map(Stmt::Expr),
             // SAFETY: we are matching on the current token, so it must exist
             _ => Err(unsafe { self.take_unchecked() }.into_error(
@@ -321,7 +321,7 @@ mod test {
 fn a(r: int) -> nothing {
     mut x = 1
     x = 2
-    answer x
+    return x
 }
 
 let r = "hello"
@@ -340,7 +340,7 @@ let u = '\n'
                     block: Block(vec![
                         Stmt::Var(Var::Mut("x".into(), Expr::Literal(Literal::Int(1)))),
                         Stmt::Var(Var::ReAssign("x".into(), Expr::Literal(Literal::Int(2)))),
-                        Stmt::Answer(Answer {
+                        Stmt::Return(Return {
                             expr: Expr::Ident("x".into())
                         })
                     ],)

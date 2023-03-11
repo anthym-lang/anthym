@@ -59,8 +59,8 @@ pub(crate) enum TokenType {
     #[token("mut")]
     KeywordMut,
 
-    #[token("answer")]
-    KeywordAnswer,
+    #[token("return")]
+    KeywordReturn,
 
     #[token(",")]
     Comma,
@@ -152,7 +152,7 @@ impl Display for TokenType {
                 KeywordElse => "`else`",
                 KeywordLet => "`let`",
                 KeywordMut => "`mut`",
-                KeywordAnswer => "`answer`",
+                KeywordReturn => "`return`",
                 Comma => "a comma",
                 Colon => "a colon",
                 Equals => "an equals sign",
