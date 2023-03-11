@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::error::{Error, ErrorKind, Result};
+use crate::expects::*;
 use crate::ice::IceExt;
 use crate::lex::lex;
 use crate::token::{Token, TokenType};
@@ -65,28 +66,38 @@ impl<'a> Parser<'a> {
 
     fn ident(&mut self) -> Result<Ident> {
         self.take()
-            .ok_or_else(|| Error::eof(self.source, [TokenType::Ident].into()))
+            .ok_or_else(|| Error::eof(self.source, IDENT.into()))
             .and_then(|owned| match owned.token {
                 TokenType::Ident => Ok(owned.raw.into()),
                 _ => Err(owned.into_error(
                     self.source,
                     ErrorKind::Expected {
-                        expected: [TokenType::Ident].into(),
+                        expected: IDENT.into(),
                     },
                 )),
             })
     }
 
-    // FIXME: formatting wut????
     fn literal(&mut self) -> Result<Literal> {
-        self.take().ok_or_else(|| Error::eof(self.source, [TokenType::IntLiteral, TokenType::BoolLiteral, TokenType::CharLiteral, TokenType::FloatLiteral, TokenType::StringLiteral].into())).and_then(|owned| match owned.token {
-            TokenType::FloatLiteral => Ok(Literal::Float(owned.raw.parse().unwrap_or_ice_msg("the lexer and the parser think that float literals are different things"))),
-            TokenType::IntLiteral => Ok(Literal::Int(owned.raw.parse().unwrap_or_ice_msg("the lexer and the parser are arguing about the definition of an integer literal"))),
-            TokenType::BoolLiteral => Ok(Literal::Bool(owned.raw.parse().unwrap_or_ice_msg("the lexer and the parser can't agree on what a boolean literal is"))),
-            TokenType::CharLiteral => Ok(Literal::Char(unescape(owned.raw).unwrap_or_ice_msg("the lexer and the parser are clashing about the definition of an escape sequence").parse().unwrap_or_ice_msg("the lexer and the parser are debating the definition of a character literal"))),
-            TokenType::StringLiteral => Ok(Literal::Str(unescape(owned.raw).unwrap_or_ice_msg("the lexer and the parser are having a heated argument about what an escape sequence").parse().unwrap_or_ice_msg("the lexer and the parser are fighting about the definition of a string literal"))),
-            _ => Err(owned.into_error(self.source, ErrorKind::Expected { expected: [TokenType::IntLiteral, TokenType::BoolLiteral, TokenType::CharLiteral, TokenType::FloatLiteral, TokenType::StringLiteral].into() })),
-        })
+        self.take()
+            .ok_or_else(|| Error::eof(self.source, LITERAL.into()))
+            .and_then(|owned| match owned.token {
+                TokenType::FloatLiteral => Ok(Literal::Float(owned.raw.parse().unwrap_or_ice())),
+                TokenType::IntLiteral => Ok(Literal::Int(owned.raw.parse().unwrap_or_ice())),
+                TokenType::BoolLiteral => Ok(Literal::Bool(owned.raw.parse().unwrap_or_ice())),
+                TokenType::CharLiteral => Ok(Literal::Char(
+                    unescape(owned.raw).unwrap_or_ice().parse().unwrap_or_ice(),
+                )),
+                TokenType::StringLiteral => Ok(Literal::Str(
+                    unescape(owned.raw).unwrap_or_ice().parse().unwrap_or_ice(),
+                )),
+                _ => Err(owned.into_error(
+                    self.source,
+                    ErrorKind::Expected {
+                        expected: LITERAL.into(),
+                    },
+                )),
+            })
     }
 
     fn fn_call(&mut self) -> Result<FnCall> {
@@ -113,26 +124,11 @@ impl<'a> Parser<'a> {
     }
 
     fn expr(&mut self) -> Result<Expr> {
-        let current = self.current().ok_or_else(|| {
-            Error::eof(
-                self.source,
-                [
-                    TokenType::FloatLiteral,
-                    TokenType::IntLiteral,
-                    TokenType::BoolLiteral,
-                    TokenType::CharLiteral,
-                    TokenType::StringLiteral,
-                    TokenType::Ident,
-                ]
-                .into(),
-            )
-        })?;
+        let current = self
+            .current()
+            .ok_or_else(|| Error::eof(self.source, EXPR.into()))?;
         match &current.token {
-            TokenType::FloatLiteral
-            | TokenType::IntLiteral
-            | TokenType::BoolLiteral
-            | TokenType::CharLiteral
-            | TokenType::StringLiteral => self.literal().map(Expr::Literal),
+            literal if LITERAL.contains(literal) => self.literal().map(Expr::Literal),
             TokenType::Ident => match self.peek(1) {
                 Some(inner) => match inner.token {
                     TokenType::LParen => self.fn_call().map(Expr::FnCall),
@@ -144,15 +140,7 @@ impl<'a> Parser<'a> {
             _ => Err(unsafe { self.take_unchecked() }.into_error(
                 self.source,
                 ErrorKind::Expected {
-                    expected: [
-                        TokenType::FloatLiteral,
-                        TokenType::IntLiteral,
-                        TokenType::BoolLiteral,
-                        TokenType::CharLiteral,
-                        TokenType::StringLiteral,
-                        TokenType::Ident,
-                    ]
-                    .into(),
+                    expected: EXPR.into(),
                 },
             )),
         }
@@ -196,17 +184,9 @@ impl<'a> Parser<'a> {
     }
 
     fn var(&mut self) -> Result<Var> {
-        let current = self.current().ok_or_else(|| {
-            Error::eof(
-                self.source,
-                [
-                    TokenType::KeywordLet,
-                    TokenType::KeywordMut,
-                    TokenType::Ident,
-                ]
-                .into(),
-            )
-        })?;
+        let current = self
+            .current()
+            .ok_or_else(|| Error::eof(self.source, VAR.into()))?;
         match current.token {
             TokenType::KeywordLet => {
                 self.take();
@@ -232,12 +212,7 @@ impl<'a> Parser<'a> {
             _ => Err(unsafe { self.take_unchecked() }.into_error(
                 self.source,
                 ErrorKind::Expected {
-                    expected: [
-                        TokenType::KeywordLet,
-                        TokenType::KeywordMut,
-                        TokenType::Ident,
-                    ]
-                    .into(),
+                    expected: VAR.into(),
                 },
             )),
         }
@@ -251,7 +226,7 @@ impl<'a> Parser<'a> {
             self.token(TokenType::KeywordElse)?;
             if self
                 .current_is_token(TokenType::KeywordIf)
-                .ok_or_else(|| Error::eof(self.source, [TokenType::KeywordIf].into()))?
+                .ok_or_else(|| Error::eof(self.source, IF_STMT.into()))?
             {
                 else_ifs.push((self.expr()?, self.block()?));
             } else {
@@ -272,7 +247,7 @@ impl<'a> Parser<'a> {
     fn stmt(&mut self) -> Result<Stmt> {
         match self
             .current()
-            .ok_or_else(|| Error::eof(self.source, [TokenType::Error].into()))?
+            .ok_or_else(|| Error::eof(self.source, STMT.into()))?
             .token
         {
             TokenType::KeywordIf => self.if_stmt().map(Stmt::If),
@@ -282,7 +257,14 @@ impl<'a> Parser<'a> {
                 self.var().map(Stmt::Var)
             }
             TokenType::KeywordAnswer => self.answer().map(Stmt::Answer),
-            _ => self.expr().map(Stmt::Expr),
+            other if EXPR.contains(&other) => self.expr().map(Stmt::Expr),
+            // SAFETY: we are matching on the current token, so it must exist
+            _ => Err(unsafe { self.take_unchecked() }.into_error(
+                self.source,
+                ErrorKind::Expected {
+                    expected: STMT.into(),
+                },
+            )),
         }
     }
 

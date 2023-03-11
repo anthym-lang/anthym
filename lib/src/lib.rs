@@ -10,6 +10,7 @@ mod ast;
 mod builtins;
 mod env;
 mod error;
+mod expects;
 pub mod fmt;
 mod function;
 mod ice;

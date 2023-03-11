@@ -171,12 +171,12 @@ impl Display for TokenType {
                 RParen => "a right parenthesis (`)`)",
                 LBrace => "a left brace (`{`)",
                 RBrace => "a right brace (`}`)",
-                FloatLiteral => "a float literal (eg. 314.1e-2)",
-                IntLiteral => "an int literal (eg. -5)",
-                BoolLiteral => "a boolean literal (true or false)",
-                StringLiteral => "a string literal (eg. \"Hello, World!\\n\")",
-                CharLiteral => "a character literal (eg. '\\n')",
-                Ident => "an identifier (eg. variable)",
+                FloatLiteral => "a float literal (eg. `314.1e-2`)",
+                IntLiteral => "an int literal (eg. `-5`)",
+                BoolLiteral => "a boolean literal (`true` or `false`)",
+                StringLiteral => "a string literal (eg. `\"Hello, World!\\n\"`)",
+                CharLiteral => "a character literal (eg. `'\\n'`)",
+                Ident => "an identifier (eg. `variable`)",
                 Error => "an error",
             }
         )
