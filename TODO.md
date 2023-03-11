@@ -11,7 +11,6 @@ Emphasized = currently working on
  * JIT w/ bytecode?????
 
 ## Refactors
-* ***Generate parser error messages, maybe with macro?***
 * Stop using anyhow, switch to thiserror
 * Rewrite evaluator, maybe with register machine
 * Merge error types for nicer handling
