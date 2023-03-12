@@ -395,7 +395,6 @@ name = "lib"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cc",
  "cranelift",
  "cranelift-jit",
  "cranelift-module",

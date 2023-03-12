@@ -9,9 +9,11 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{DataContext, FuncOrDataId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::mem::transmute;
-use std::path::PathBuf;
-use std::process::exit;
+use std::path::{Path, PathBuf};
+use std::process::{exit, Command};
 
 #[derive(Debug)]
 pub enum Options {
@@ -88,7 +90,12 @@ impl Jit<JITModule> {
 }
 
 impl Jit<ObjectModule> {
-    fn new_build(options: BuildOptions) -> Self {
+    fn try_pathbuf_to_str(buf: &Path) -> Result<&str> {
+        buf.to_str()
+            .ok_or_else(|| anyhow!("path contains invalid characters"))
+    }
+
+    fn new_build(options: BuildOptions) -> Result<Self> {
         let mut flags = settings::builder();
         flags
             .set("opt_level", &options.opt_level.to_string())
@@ -98,9 +105,11 @@ impl Jit<ObjectModule> {
         let isa = isa_builder
             .finish(settings::Flags::new(flags))
             .unwrap_or_ice();
+        let mut out_path = options.output;
+        out_path.set_extension("o");
         let builder = ObjectBuilder::new(
             isa,
-            &*options.output.to_string_lossy(),
+            Self::try_pathbuf_to_str(&out_path)?,
             cranelift_module::default_libcall_names(),
         )
         .unwrap_or_ice();
@@ -108,20 +117,30 @@ impl Jit<ObjectModule> {
         //                                                                  // work here
         let module = ObjectModule::new(builder);
 
-        Self {
+        Ok(Self {
             builder_context: FunctionBuilderContext::new(),
             ctx: module.make_context(),
             data_ctx: DataContext::new(),
             module,
-        }
+        })
     }
 
-    fn build(mut self, options: BuildOptions, input: &str) -> Result<()> {
+    fn build(mut self, output: PathBuf, input: &str) -> Result<()> {
         self.compile(input)?;
-        self.module.finish();
-        cc::Build::new()
-            .object(options.output.clone())
-            .compile(&options.output.to_string_lossy());
+        let obj = self.module.finish();
+        let mut object = output.clone();
+        object.set_extension("o");
+        {
+            let mut file = File::create(&object)?;
+            file.write_all(&obj.object.write()?)?;
+        }
+        Command::new("cc")
+            .args([
+                "-o",
+                Self::try_pathbuf_to_str(&output)?,
+                Self::try_pathbuf_to_str(&object)?,
+            ])
+            .status()?;
         Ok(())
     }
 }
@@ -427,7 +446,7 @@ pub fn jit_text(options: Options, input: impl AsRef<str>) -> Result<()> {
     match options {
         Options::Jit(jit_opts) => Jit::new_jit(jit_opts).run(input.as_ref()),
         Options::Build(build_opts) => {
-            Jit::new_build(build_opts.clone()).build(build_opts, input.as_ref())
+            Jit::new_build(build_opts.clone())?.build(build_opts.output, input.as_ref())
         }
     }
 }
