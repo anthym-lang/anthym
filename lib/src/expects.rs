@@ -50,7 +50,7 @@ pub(crate) const LITERAL: [TokenType; 5] = [
 ];
 // pub(crate) const FN_CALL: [TokenType; 1] = IDENT;
 pub(crate) const EXPR: [TokenType; 6] = concat_array!(IDENT, LITERAL);
-pub(crate) const FN_DECL: [TokenType; 1] = [TokenType::KeywordFn];
+// pub(crate) const FN_DECL: [TokenType; 1] = [TokenType::KeywordFn];
 pub(crate) const VAR: [TokenType; 3] = [
     TokenType::KeywordLet,
     TokenType::KeywordMut,
@@ -58,5 +58,5 @@ pub(crate) const VAR: [TokenType; 3] = [
 ];
 pub(crate) const IF_STMT: [TokenType; 1] = [TokenType::KeywordIf];
 pub(crate) const RETURN: [TokenType; 1] = [TokenType::KeywordReturn];
-pub(crate) const STMT: [TokenType; 12] = concat_array!(IF_STMT, FN_DECL, VAR, RETURN, EXPR);
+pub(crate) const STMT: [TokenType; 11] = concat_array!(IF_STMT, VAR, RETURN, EXPR);
 // pub(crate) const BLOCK: [TokenType; 1] = [TokenType::LBrace];

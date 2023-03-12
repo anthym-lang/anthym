@@ -39,7 +39,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn program(&mut self) -> Result<Program> {
         from_fn(|| {
             if self.current().is_some() {
-                Some(self.stmt())
+                Some(self.fn_decl())
             } else {
                 None
             }
@@ -191,16 +191,20 @@ impl<'a> Parser<'a> {
             TokenType::KeywordLet => {
                 self.take();
                 let name = self.ident()?;
+                self.token(TokenType::Colon)?;
+                let ty = self.ident()?;
                 self.token(TokenType::Equals)?;
                 let value = self.expr()?;
-                Ok(Var::Let(name, value))
+                Ok(Var::Let(name, ty, value))
             }
             TokenType::KeywordMut => {
                 self.take();
                 let name = self.ident()?;
+                self.token(TokenType::Colon)?;
+                let ty = self.ident()?;
                 self.token(TokenType::Equals)?;
                 let value = self.expr()?;
-                Ok(Var::Mut(name, value))
+                Ok(Var::Mut(name, ty, value))
             }
             TokenType::Ident => {
                 let name = self.ident()?;
@@ -251,7 +255,6 @@ impl<'a> Parser<'a> {
             .token
         {
             TokenType::KeywordIf => self.if_stmt().map(Stmt::If),
-            TokenType::KeywordFn => self.fn_decl().map(Stmt::Fn),
             TokenType::KeywordLet | TokenType::KeywordMut => self.var().map(Stmt::Var),
             TokenType::Ident if self.peek_is_token(1, TokenType::Equals).unwrap_or(false) => {
                 self.var().map(Stmt::Var)
@@ -319,42 +322,65 @@ mod test {
     fn test_parser() {
         let program = r#"
 fn a(r: int) -> nothing {
-    mut x = 1
+    mut x: int = 1
     x = 2
     return x
 }
 
-let r = "hello"
-let s = "hello\n"
-let t = 'a'
-let u = '\n'
+fn main() -> nothing {
+    let r: string = "hello"
+    let s: string = "hello\n"
+    let t: char = 'a'
+    let u: char = '\n'
+}
 "#;
         let ast = parse_text(program);
         assert_eq!(
             ast.map_err(|err| err.to_string()),
             Ok(Program(vec![
-                Stmt::Fn(FnDecl {
+                FnDecl {
                     name: "a".into(),
                     args: vec![("r".into(), "int".into())],
                     ret: "nothing".into(),
                     block: Block(vec![
-                        Stmt::Var(Var::Mut("x".into(), Expr::Literal(Literal::Int(1)))),
+                        Stmt::Var(Var::Mut(
+                            "x".into(),
+                            "int".into(),
+                            Expr::Literal(Literal::Int(1))
+                        )),
                         Stmt::Var(Var::ReAssign("x".into(), Expr::Literal(Literal::Int(2)))),
                         Stmt::Return(Return {
                             expr: Expr::Ident("x".into())
                         })
                     ],)
-                }),
-                Stmt::Var(Var::Let(
-                    "r".into(),
-                    Expr::Literal(Literal::Str("hello".into()))
-                )),
-                Stmt::Var(Var::Let(
-                    "s".into(),
-                    Expr::Literal(Literal::Str("hello\n".into()))
-                )),
-                Stmt::Var(Var::Let("t".into(), Expr::Literal(Literal::Char('a')))),
-                Stmt::Var(Var::Let("u".into(), Expr::Literal(Literal::Char('\n'))))
+                },
+                FnDecl {
+                    name: "main".into(),
+                    args: vec![],
+                    ret: "nothing".into(),
+                    block: Block(vec![
+                        Stmt::Var(Var::Let(
+                            "r".into(),
+                            "string".into(),
+                            Expr::Literal(Literal::Str("hello".into()))
+                        )),
+                        Stmt::Var(Var::Let(
+                            "s".into(),
+                            "string".into(),
+                            Expr::Literal(Literal::Str("hello\n".into()))
+                        )),
+                        Stmt::Var(Var::Let(
+                            "t".into(),
+                            "char".into(),
+                            Expr::Literal(Literal::Char('a'))
+                        )),
+                        Stmt::Var(Var::Let(
+                            "u".into(),
+                            "char".into(),
+                            Expr::Literal(Literal::Char('\n'))
+                        ))
+                    ])
+                }
             ]))
         );
     }

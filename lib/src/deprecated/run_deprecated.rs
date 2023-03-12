@@ -75,18 +75,15 @@ fn run_expr(expr: Expr, env: SharedEnv) -> Result<Value> {
 
 fn run_stmt(stmt: Stmt, env: SharedEnv) -> Result<Option<Value>> {
     match stmt {
-        Stmt::Fn(decl) => {
-            run_fn_decl(decl, env)?;
-        }
         Stmt::If(if_stmt) => {
             run_if(if_stmt, env)?;
         }
         Stmt::Var(decl) => match decl {
-            Var::Let(name, val) => {
+            Var::Let(name, _ty, val) => {
                 let res = run_expr(val, env.clone())?;
                 env.borrow_mut().set(false, name, res)?;
             }
-            Var::Mut(name, val) => {
+            Var::Mut(name, _ty, val) => {
                 let res = run_expr(val, env.clone())?;
                 env.borrow_mut().set(true, name, res)?;
             }
@@ -119,14 +116,20 @@ pub fn run_text(raw: &str) -> Result<()> {
     let ast = parse_text(raw)?;
     let global = Env::global();
 
-    for stmt in ast.0 {
-        if let Some(code) = run_stmt(stmt, global.clone())? {
-            match code {
-                Value::Number(n) => exit(n),
-                Value::Nothing => break,
-                other => bail!("invalid exit code: `{other}`"),
-            }
-        }
+    for decl in ast.0 {
+        run_fn_decl(decl, global.clone())?;
+    }
+
+    match run_fn_call(
+        FnCall {
+            name: "main".into(),
+            args: vec![],
+        },
+        global,
+    )? {
+        Value::Number(n) => exit(n),
+        Value::Nothing => {}
+        other => bail!("invalid exit code: `{other}`"),
     }
 
     Ok(())

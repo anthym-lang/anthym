@@ -111,11 +111,10 @@ impl Display for Stmt {
             "{}",
             match self {
                 Stmt::Var(var) => match var {
-                    Var::Let(name, value) => format!("let {name} = {value}",),
-                    Var::Mut(name, value) => format!("mut {name} = {value}",),
+                    Var::Let(name, ty, value) => format!("let {name}: {ty} = {value}",),
+                    Var::Mut(name, ty, value) => format!("mut {name}: {ty} = {value}",),
                     Var::ReAssign(name, value) => format!("{name} = {value}",),
                 },
-                Stmt::Fn(decl) => decl.to_string(),
                 Stmt::If(if_stmt) => if_stmt.to_string(),
                 Stmt::Return(return_) => return_.to_string(),
                 Stmt::Expr(expr) => expr.to_string(),

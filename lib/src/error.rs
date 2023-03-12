@@ -1,3 +1,4 @@
+use crate::ice::IceExt;
 use crate::token::TokenType;
 use std::error::Error as ErrorTrait;
 use std::fmt::Display;
@@ -21,11 +22,12 @@ fn listify(list: &[impl Display]) -> String {
         .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", ");
-    let last = list.last().map(ToString::to_string);
-    if let Some(last) = last {
-        format!("{until_last}, or {last}")
+    let last = list.last().map(ToString::to_string).unwrap_or_ice(); // we never pass an empty
+                                                                     // array to this
+    if until_last.is_empty() {
+        last
     } else {
-        until_last.into()
+        format!("{until_last}, or {last}")
     }
 }
 

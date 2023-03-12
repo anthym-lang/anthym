@@ -1,5 +1,5 @@
 use crate::ast::Ident;
-use crate::builtins::*;
+use crate::builtins_deprecated::*;
 use crate::value::Value;
 use anyhow::{anyhow, bail, Result};
 use std::cell::RefCell;

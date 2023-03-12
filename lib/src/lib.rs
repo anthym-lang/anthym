@@ -5,18 +5,21 @@
     missing_debug_implementations,
     clippy::undocumented_unsafe_blocks
 )]
-#![feature(unboxed_closures, fn_traits)]
+// #![feature(unboxed_closures, fn_traits)]
 mod ast;
 mod builtins;
-mod env;
+// mod builtins_deprecated;
+// mod env;
 mod error;
 mod expects;
 pub mod fmt;
-mod function;
+// mod function;
 mod ice;
+pub mod jit;
 mod lex;
 mod parse;
-pub mod run;
+// mod run_deprecated;
+mod build;
 mod token;
 mod unescape;
-mod value;
+// mod value;

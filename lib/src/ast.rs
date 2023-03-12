@@ -47,8 +47,8 @@ pub(crate) struct FnDecl {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Var {
-    Let(Ident, Expr),
-    Mut(Ident, Expr),
+    Let(Ident, Ident, Expr),
+    Mut(Ident, Ident, Expr),
     ReAssign(Ident, Expr),
 }
 
@@ -66,7 +66,6 @@ pub(crate) struct Return {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Stmt {
-    Fn(FnDecl),
     Var(Var),
     If(If),
     Return(Return),
@@ -82,9 +81,9 @@ impl FromIterator<Stmt> for Block {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Program(pub(crate) Vec<Stmt>);
-impl FromIterator<Stmt> for Program {
-    fn from_iter<T: IntoIterator<Item = Stmt>>(iter: T) -> Self {
+pub(crate) struct Program(pub(crate) Vec<FnDecl>);
+impl FromIterator<FnDecl> for Program {
+    fn from_iter<T: IntoIterator<Item = FnDecl>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }

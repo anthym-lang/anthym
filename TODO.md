@@ -15,3 +15,4 @@ Emphasized = currently working on
 * Rewrite evaluator, maybe with register machine
 * Merge error types for nicer handling
 * Nicer error messages by storing info in AST (+ custom error type and macros)
+* Stop using impl trait

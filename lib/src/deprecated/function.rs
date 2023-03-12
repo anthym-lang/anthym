@@ -1,6 +1,6 @@
 use crate::ast::{Block, Ident};
 use crate::env::SharedEnv;
-use crate::run::run_block;
+use crate::run_deprecated::run_block;
 use crate::value::Value;
 use anyhow::{bail, Ok, Result};
 use std::rc::Rc;
