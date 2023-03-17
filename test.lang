@@ -1,0 +1,5 @@
+fn main() -> int {
+    let hello_world: string = "Hello, World!"
+    print(hello_world)
+    return 42
+}

@@ -7,3 +7,4 @@ edition = "2021"
 clap = { version = "4.0", features = ["derive"] }
 anyhow = "1.0"
 lib = { path = "../lib" }
+pretty_env_logger = "0.4.0"

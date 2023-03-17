@@ -58,6 +58,7 @@ impl From<OptLevel> for jit::OptLevel {
 }
 
 fn main() -> Result<()> {
+    pretty_env_logger::init();
     let cli = Cli::parse();
 
     match cli.cmd {

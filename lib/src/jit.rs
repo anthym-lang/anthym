@@ -1,5 +1,5 @@
-use crate::ast::{Expr, FnCall, FnDecl, Ident, If, Literal, Stmt, Var};
-use crate::builtins::{self, BUILTINS};
+use crate::ast::{self, Expr, FnCall, FnDecl, Ident, If, Literal, Stmt, Var};
+use crate::builtins::{self, BUILTINS, BUILTINS_SRC};
 use crate::ice::IceExt;
 use crate::parse::parse_text;
 use anyhow::{anyhow, bail, Result};
@@ -8,12 +8,23 @@ use cranelift::prelude::*;
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{DataContext, FuncOrDataId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
+use log::*;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
+use std::env::set_current_dir;
+use std::fs::{create_dir_all, File};
+use std::io::{BufWriter, Write};
 use std::mem::transmute;
 use std::path::{Path, PathBuf};
-use std::process::{exit, Command};
+use std::process::exit;
+use target_lexicon::Triple;
+
+fn get_pointer_type() -> Result<Type> {
+    let bits = Triple::host()
+        .pointer_width()
+        .map_err(|_| anyhow!("could not get pointer width"))?
+        .bits();
+    Ok(Type::int(bits as u16).unwrap_or_ice())
+}
 
 #[derive(Debug)]
 pub enum Options {
@@ -21,10 +32,14 @@ pub enum Options {
     Build(BuildOptions),
 }
 
+trait IsOption {}
+
 #[derive(Debug)]
 pub struct JitOptions {
     pub opt_level: OptLevel,
 }
+
+impl IsOption for JitOptions {}
 
 #[derive(Debug, Clone)]
 pub struct BuildOptions {
@@ -32,18 +47,24 @@ pub struct BuildOptions {
     pub output: PathBuf,
 }
 
-struct Jit<T>
+impl IsOption for BuildOptions {}
+
+struct Jit<T, U>
 where
     T: Module,
+    U: IsOption,
 {
     builder_context: FunctionBuilderContext,
     ctx: codegen::Context,
     data_ctx: DataContext,
     module: T,
+    options: U,
 }
 
-impl Jit<JITModule> {
-    fn new_jit(options: JitOptions) -> Self {
+impl Jit<JITModule, JitOptions> {
+    fn new(options: JitOptions) -> Self {
+        info!("creating new jit");
+        info!("configuring cranelift");
         let mut flags = settings::builder();
         flags.set("use_colocated_libcalls", "false").unwrap_or_ice();
         flags.set("is_pic", "false").unwrap_or_ice();
@@ -55,21 +76,26 @@ impl Jit<JITModule> {
         let isa = isa_builder
             .finish(settings::Flags::new(flags))
             .unwrap_or_ice();
+        info!("adding builtin symbols");
         let mut builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+        builder.symbol("print", builtins::print as *const u8);
         builder.symbol("print_char", builtins::print_char as *const u8);
         let module = JITModule::new(builder);
-
+        info!("ready to jit");
         Self {
             builder_context: FunctionBuilderContext::new(),
             ctx: module.make_context(),
             data_ctx: DataContext::new(),
+            options,
             module,
         }
     }
 
     fn run(mut self, input: &str) -> Result<()> {
+        info!("compiling input");
         self.compile(input)?;
         self.module.finalize_definitions()?;
+        info!("locating main");
         let main = self
             .module
             .get_name("main")
@@ -81,6 +107,7 @@ impl Jit<JITModule> {
 
         let code_ptr = self.module.get_finalized_function(main);
 
+        info!("jumping");
         // SAFETY: this might be completely unsafe
         unsafe {
             let code_fn: fn() -> i32 = transmute(code_ptr);
@@ -89,65 +116,97 @@ impl Jit<JITModule> {
     }
 }
 
-impl Jit<ObjectModule> {
-    fn try_pathbuf_to_str(buf: &Path) -> Result<&str> {
+impl Jit<ObjectModule, BuildOptions> {
+    fn try_path_to_str(buf: &Path) -> Result<&str> {
         buf.to_str()
             .ok_or_else(|| anyhow!("path contains invalid characters"))
     }
 
-    fn new_build(options: BuildOptions) -> Result<Self> {
+    fn new(options: BuildOptions) -> Result<Self> {
+        info!("creating new build");
+        info!("configuring cranelift");
         let mut flags = settings::builder();
+        flags.enable("is_pic").unwrap_or_ice();
         flags
             .set("opt_level", &options.opt_level.to_string())
             .unwrap_or_ice();
         let isa_builder =
-            cranelift_native::builder().unwrap_or_ice_msg("host machine is not supported fot JIT");
+            cranelift_native::builder().unwrap_or_ice_msg("host machine is not supported fot JIT"); // TODO:
+                                                                                                    // cross compilation
         let isa = isa_builder
             .finish(settings::Flags::new(flags))
             .unwrap_or_ice();
-        let mut out_path = options.output;
+        let mut out_path = options.output.clone();
         out_path.set_extension("o");
         let builder = ObjectBuilder::new(
             isa,
-            Self::try_pathbuf_to_str(&out_path)?,
+            Self::try_path_to_str(&out_path)?,
             cranelift_module::default_libcall_names(),
         )
         .unwrap_or_ice();
-        // builder.symbol("print_char", builtins::print_char as *const u8); // FIXME: make builtins
-        //                                                                  // work here
         let module = ObjectModule::new(builder);
 
+        info!("ready to build");
         Ok(Self {
             builder_context: FunctionBuilderContext::new(),
             ctx: module.make_context(),
             data_ctx: DataContext::new(),
+            options,
             module,
         })
     }
 
-    fn build(mut self, output: PathBuf, input: &str) -> Result<()> {
+    fn build(mut self, input: &str) -> Result<()> {
+        create_dir_all("./output/artifacts/")?;
+        set_current_dir("./output/artifacts/")?;
+        info!("compiling input");
         self.compile(input)?;
         let obj = self.module.finish();
-        let mut object = output.clone();
-        object.set_extension("o");
+        info!("writing object file");
+        let mut object_file = self.options.output.clone();
+        object_file.set_extension("o");
         {
-            let mut file = File::create(&object)?;
-            file.write_all(&obj.object.write()?)?;
+            let file = BufWriter::new(File::create(&object_file)?);
+            obj.object
+                .write_stream(file)
+                .map_err(|err| anyhow!("{err}"))?;
         }
-        Command::new("cc")
-            .args([
-                "-o",
-                Self::try_pathbuf_to_str(&output)?,
-                Self::try_pathbuf_to_str(&object)?,
-            ])
-            .status()?;
+
+        let file = File::create("./builtins.c")?;
+        {
+            let mut writer = BufWriter::new(&file);
+            writer.write_all(BUILTINS_SRC)?;
+        }
+
+        let host_and_target = Triple::host().to_string();
+        info!("configuring link command");
+        let mut cmd = cc::Build::new()
+            .cargo_metadata(false)
+            .opt_level_str("z")
+            .host(&host_and_target)
+            .target(&host_and_target) // TODO: allow for custom targets
+            .debug(false)
+            .flag("./builtins.c")
+            .flag(Self::try_path_to_str(&object_file)?)
+            .try_get_compiler()?
+            .to_command();
+        if host_and_target.contains("msvc") {
+            cmd.arg(format!("-out:{}", self.options.output.display()));
+        } else {
+            cmd.arg("-o");
+            cmd.arg(format!("../{}", self.options.output.display()));
+        }
+        debug!("link command: {cmd:?}");
+        info!("running link command");
+        cmd.status()?;
         Ok(())
     }
 }
 
-impl<T> Jit<T>
+impl<T, U> Jit<T, U>
 where
     T: Module,
+    U: IsOption,
 {
     fn compile(&mut self, input: &str) -> Result<()> {
         let program = parse_text(input)?;
@@ -188,6 +247,7 @@ where
         let mut translator = FunctionTranslator {
             builder,
             vars,
+            data_ctx: &mut self.data_ctx,
             module: &mut self.module,
         };
 
@@ -206,6 +266,7 @@ where
 {
     builder: FunctionBuilder<'a>,
     vars: HashMap<Ident, (bool, Variable)>,
+    data_ctx: &'a mut DataContext,
     module: &'a mut T,
 }
 
@@ -229,31 +290,28 @@ where
         Ok(())
     }
 
-    fn translate_if(&mut self, if_stmt: If) -> Result<()> {
-        let if_condition = self.translate_expr(if_stmt.if_stmt.0)?;
-        let if_block = self.builder.create_block();
-        if if_stmt.else_ifs.len() > 1 {
-            bail!("elseifs are not supported (yet)"); // TODO: support elseifs
+    fn translate_if_block(&mut self, merge_block: Block, ast_block: ast::Block) -> Result<Block> {
+        let block = self.builder.create_block();
+        self.builder.switch_to_block(block);
+        self.builder.seal_block(block);
+        for stmt in ast_block.0 {
+            self.translate_stmt(stmt)?;
         }
-        let else_block = self.builder.create_block();
+        self.builder.ins().jump(merge_block, &[]);
+        Ok(block)
+    }
+
+    fn translate_if(&mut self, if_stmt: If) -> Result<()> {
         let merge_block = self.builder.create_block();
+        let if_condition = self.translate_expr(if_stmt.if_stmt.0)?;
+        let if_block = self.translate_if_block(merge_block, if_stmt.if_stmt.1)?;
+        // TODO: ELSEIFS!!!
+        let else_block = self.translate_if_block(merge_block, if_stmt.else_block)?;
 
         self.builder
             .ins()
             .brif(if_condition, if_block, &[], else_block, &[]);
-        self.builder.switch_to_block(if_block);
-        self.builder.seal_block(if_block);
-        for stmt in if_stmt.if_stmt.1 .0 {
-            self.translate_stmt(stmt)?;
-        }
-        self.builder.ins().jump(merge_block, &[]);
 
-        self.builder.switch_to_block(else_block);
-        self.builder.seal_block(else_block);
-        for stmt in if_stmt.else_block.0 {
-            self.translate_stmt(stmt)?;
-        }
-        self.builder.ins().jump(merge_block, &[]);
         self.builder.switch_to_block(merge_block);
         self.builder.seal_block(merge_block);
 
@@ -278,12 +336,25 @@ where
 
     fn translate_literal(&mut self, literal: Literal) -> Result<Value> {
         match literal {
-            Literal::Int(int) => Ok(self.builder.ins().iconst(types::I32, int as i64)), // FIXME: use int's real type
+            Literal::Int(int) => Ok(self.builder.ins().iconst(types::I32, int as i64)),
             Literal::Float(float) => Ok(self.builder.ins().f32const(float)),
             Literal::Bool(bool) => Ok(self.builder.ins().iconst(types::I8, bool as i64)),
-            Literal::Str(_str) => todo!("strings are not supported (yet)"),
+            Literal::Str(str) => Ok(self.translate_string(str)?),
             Literal::Char(char) => Ok(self.builder.ins().iconst(types::I8, char as i64)),
         }
+    }
+
+    fn translate_string(&mut self, string: String) -> Result<Value> {
+        self.data_ctx
+            .define(format!("{string}\0").as_bytes().to_vec().into_boxed_slice());
+        let sym = self.module.declare_anonymous_data(true, false)?;
+        let _result = self.module.define_data(sym, self.data_ctx);
+        let local_id = self.module.declare_data_in_func(sym, self.builder.func);
+        self.data_ctx.clear();
+        Ok(self
+            .builder
+            .ins()
+            .symbol_value(get_pointer_type()?, local_id))
     }
 
     fn translate_var(&mut self, var: Var) -> Result<()> {
@@ -350,17 +421,15 @@ where
     }
 }
 
-fn ident_to_type(ident: &Ident) -> Result<types::Type> {
-    let ty = match &*ident.0 {
-        "float" => types::F32,
-        "int" => types::I32,
-        "bool" => types::I8,
-        "string" => todo!("strings are not supported (yet)"),
-        "char" => types::I8,
+fn ident_to_type(ident: &Ident) -> Result<Type> {
+    match &*ident.0 {
+        "float" => Ok(types::F32),
+        "int" => Ok(types::I32),
+        "bool" => Ok(types::I8),
+        "string" => get_pointer_type(),
+        "char" => Ok(types::I8),
         ty => bail!("type not found: {ty}"),
-    };
-
-    Ok(ty)
+    }
 }
 
 fn init_func_args(
@@ -425,7 +494,7 @@ fn declare_variables_in_stmt(
 }
 
 fn declare_variable(
-    ty: types::Type,
+    ty: Type,
     builder: &mut FunctionBuilder<'_>,
     vars: &mut HashMap<Ident, (bool, Variable)>,
     idx: &mut usize,
@@ -444,9 +513,9 @@ fn declare_variable(
 
 pub fn jit_text(options: Options, input: impl AsRef<str>) -> Result<()> {
     match options {
-        Options::Jit(jit_opts) => Jit::new_jit(jit_opts).run(input.as_ref()),
+        Options::Jit(jit_opts) => <Jit<JITModule, JitOptions>>::new(jit_opts).run(input.as_ref()),
         Options::Build(build_opts) => {
-            Jit::new_build(build_opts.clone())?.build(build_opts.output, input.as_ref())
+            <Jit<ObjectModule, BuildOptions>>::new(build_opts)?.build(input.as_ref())
         }
     }
 }

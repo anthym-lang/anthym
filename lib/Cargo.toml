@@ -2,6 +2,7 @@
 name = "lib"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -19,3 +20,8 @@ cranelift-native = "0.93.1"
 target-lexicon = "0.12.6"
 lazy_static = "1.4.0"
 cranelift-object = "0.93.1"
+cc = "1.0.79"
+log = "0.4.17"
+
+[build-dependencies]
+cc = "1.0.79"

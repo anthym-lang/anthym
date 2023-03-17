@@ -5,21 +5,22 @@
     missing_debug_implementations,
     clippy::undocumented_unsafe_blocks
 )]
-// #![feature(unboxed_closures, fn_traits)]
 mod ast;
 mod builtins;
-// mod builtins_deprecated;
-// mod env;
 mod error;
 mod expects;
 pub mod fmt;
-// mod function;
 mod ice;
 pub mod jit;
 mod lex;
 mod parse;
-// mod run_deprecated;
-mod build;
 mod token;
 mod unescape;
+
+// ------------------ Code for the old tree-walk interpreter ------------------
+// #![feature(unboxed_closures, fn_traits)]
+// mod builtins;
 // mod value;
+// pub mod run;
+// mod env;
+// mod function;

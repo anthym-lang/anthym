@@ -1,12 +1,15 @@
 use std::fmt::Display;
 
 pub(crate) trait IceExt<T> {
+    #[cold]
     fn unwrap_or_ice(self) -> T;
 
+    #[cold]
     fn unwrap_or_ice_msg(self, msg: &str) -> T;
 }
 
 impl<T> IceExt<T> for Option<T> {
+    #[cold]
     fn unwrap_or_ice(self) -> T {
         match self {
             Some(inner) => inner,
@@ -17,6 +20,7 @@ Please file an issue to the github repository."
         }
     }
 
+    #[cold]
     fn unwrap_or_ice_msg(self, msg: &str) -> T {
         match self {
             Some(inner) => inner,
@@ -33,6 +37,7 @@ impl<T, E> IceExt<T> for Result<T, E>
 where
     E: Display,
 {
+    #[cold]
     fn unwrap_or_ice(self) -> T {
         match self {
             Ok(inner) => inner,
@@ -44,6 +49,7 @@ The error that occured was: {err}"
         }
     }
 
+    #[cold]
     fn unwrap_or_ice_msg(self, msg: &str) -> T {
         match self {
             Ok(inner) => inner,
