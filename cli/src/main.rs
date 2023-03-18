@@ -32,10 +32,10 @@ enum Command {
         /// The file to build
         file: PathBuf,
         /// The output file
-        #[arg(short = 'O', long)]
+        #[arg(short, long)]
         output: PathBuf,
         /// Optimization level
-        #[arg(short, long)]
+        #[arg(short = 'O', long)]
         opt_level: Option<OptLevel>,
         /// Output target
         #[arg(short, long)]
