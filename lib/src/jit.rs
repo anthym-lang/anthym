@@ -16,7 +16,7 @@ use std::io::{BufWriter, Write};
 use std::mem::transmute;
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use target_lexicon::Triple;
+pub use target_lexicon::Triple;
 
 fn get_pointer_type() -> Result<Type> {
     let bits = Triple::host()
@@ -43,8 +43,9 @@ impl IsOption for JitOptions {}
 
 #[derive(Debug, Clone)]
 pub struct BuildOptions {
-    pub opt_level: OptLevel,
     pub output: PathBuf,
+    pub opt_level: OptLevel,
+    pub target: Triple,
 }
 
 impl IsOption for BuildOptions {}
@@ -130,9 +131,7 @@ impl Jit<ObjectModule, BuildOptions> {
         flags
             .set("opt_level", &options.opt_level.to_string())
             .unwrap_or_ice();
-        let isa_builder =
-            cranelift_native::builder().unwrap_or_ice_msg("host machine is not supported fot JIT"); // TODO:
-                                                                                                    // cross compilation
+        let isa_builder = isa::lookup(options.target.clone())?;
         let isa = isa_builder
             .finish(settings::Flags::new(flags))
             .unwrap_or_ice();
@@ -178,19 +177,23 @@ impl Jit<ObjectModule, BuildOptions> {
             writer.write_all(BUILTINS_SRC)?;
         }
 
-        let host_and_target = Triple::host().to_string();
+        let host = Triple::host().to_string();
         info!("configuring link command");
         let mut cmd = cc::Build::new()
             .cargo_metadata(false)
-            .opt_level_str("z")
-            .host(&host_and_target)
-            .target(&host_and_target) // TODO: allow for custom targets
+            .opt_level_str(match self.options.opt_level {
+                OptLevel::None => "0",
+                OptLevel::Speed => "3",
+                OptLevel::SpeedAndSize => "1",
+            })
+            .host(&host)
+            .target(&self.options.target.to_string()) // TODO: allow for custom targets
             .debug(false)
             .flag("./builtins.c")
             .flag(Self::try_path_to_str(&object_file)?)
             .try_get_compiler()?
             .to_command();
-        if host_and_target.contains("msvc") {
+        if host.contains("msvc") {
             cmd.arg(format!("-out:{}", self.options.output.display()));
         } else {
             cmd.arg("-o");

@@ -125,16 +125,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "lib",
- "pretty_env_logger",
-]
-
-[[package]]
 name = "cranelift"
 version = "0.93.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -639,6 +629,16 @@ dependencies = [
  "libc",
  "mach",
  "winapi",
+]
+
+[[package]]
+name = "rustic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "lib",
+ "pretty_env_logger",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use lib::fmt::format_text;
-use lib::jit::{self, jit_text, BuildOptions, JitOptions, Options};
+use lib::jit::{self, jit_text, BuildOptions, JitOptions, Options, Triple};
 use std::fs::{read_to_string, write};
 use std::path::PathBuf;
 
@@ -37,6 +37,9 @@ enum Command {
         /// Optimization level
         #[arg(short, long)]
         opt_level: Option<OptLevel>,
+        /// Output target
+        #[arg(short, long)]
+        target: Option<Triple>,
     },
 }
 
@@ -80,12 +83,14 @@ fn main() -> Result<()> {
             file,
             output,
             opt_level,
+            target,
         } => {
             let contents = read_to_string(file)?;
             jit_text(
                 Options::Build(BuildOptions {
                     output,
                     opt_level: opt_level.unwrap_or(OptLevel::SpeedAndSize).into(),
+                    target: target.unwrap_or(Triple::host()),
                 }),
                 contents,
             )?;
