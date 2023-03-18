@@ -1,5 +1,5 @@
 # <insert lanugage name after I come up with it>
-A toy language that can be ran with a JIT compiler, or with an AOT compiler. Uses the `[cranelift](https://lib.rs/cranelift/)` crate to generate object files and for JIT compilation. It uses a handwritten parser, but the lexer was generated with `[logos](https://lib.rs/logos/)`.
+A toy language that can be ran with a JIT compiler, or with an AOT compiler. Uses the [`cranelift`](https://lib.rs/cranelift/) crate to generate object files and for JIT compilation. It uses a handwritten parser, but the lexer was generated with [`logos`](https://lib.rs/logos/).
 
 ## Getting Started
 How to set up.
@@ -23,8 +23,8 @@ You now have the CLI installed! You can get help from running the CLI with the `
 ```
 
 ## Built With
-* `[cranelift](https://lib.rs/cranelift/)`
-* `[logos](https://lib.rs/logos/)`
+* [`cranelift`](https://lib.rs/cranelift/)
+* [`logos`](https://lib.rs/logos/)
 * [The Rust Programming Language](https://www.rust-lang.org/)
 
 ## License
