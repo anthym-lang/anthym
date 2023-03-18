@@ -24,7 +24,7 @@ enum Command {
         /// The file to run
         file: PathBuf,
         /// Optimization level
-        #[arg(short, long)]
+        #[arg(short = 'O', long)]
         opt_level: Option<OptLevel>,
     },
     /// Build an executable
