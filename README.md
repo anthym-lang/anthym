@@ -10,15 +10,15 @@ How to set up.
 
 ### Installation
 Clone the repository.
-```shell
+```properties
 git clone https://github.com/Phil-Gates/rustic
 ```
 Then install with `cargo`.
-```shell
+```properties
 cargo install --path cli
 ```
 You now have the CLI installed! You can get help from running the CLI with the `--help` flag, like so:
-```shell
+```properties
 rustic --help
 ```
 
