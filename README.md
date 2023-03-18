@@ -11,15 +11,15 @@ How to set up.
 ### Installation
 Clone the repository.
 ```console
-~ $ git clone https://github.com/Phil-Gates/rustic
+git clone https://github.com/Phil-Gates/rustic
 ```
 Then install with `cargo` (don't forget to `cd` into the directory first).
 ```console
-rustic $ cargo install --path cli
+cargo install --path cli
 ```
 You now have the CLI installed! You can get help from running the CLI with the `--help` flag, like so:
 ```console
-rustic $ rustic --help
+rustic --help
 ```
 
 ## Built With
