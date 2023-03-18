@@ -6,6 +6,6 @@ char* print(char* value) {
 }
 
 char print_char(char value) {
-    printf("%c\n", value);
+    putchar(value);
     return value;
 }
