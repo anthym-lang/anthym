@@ -9,16 +9,15 @@ How to set up.
 * [The Rust Toolchain](https://rustup.rs/)
 
 ### Installation
-Clone the repository.
+Clone the repository:
 ```
 git clone https://github.com/Phil-Gates/rustic
 ```
-Then install with `cargo` (don't forget to `cd` into the directory first).
+Then install with `cargo` (don't forget to `cd` into the directory first):
 ```
 cargo install --path cli
 ```
-Now write a file (you can call it `hello.rustic`)
-It will contain:
+Now create a file called `hello.rustic`. It will contaian the following:
 ```rust
 fn main() -> int {
     print("Hello, World!")
