@@ -6,7 +6,6 @@
     clippy::undocumented_unsafe_blocks
 )]
 mod ast;
-mod builtins;
 mod error;
 mod expects;
 pub mod fmt;
@@ -14,6 +13,7 @@ mod ice;
 pub mod jit;
 mod lex;
 mod parse;
+mod rustic_std;
 mod token;
 mod unescape;
 

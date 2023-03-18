@@ -1,3 +1,5 @@
 fn main() {
-    cc::Build::new().file("src/builtins.c").compile("builtins");
+    cc::Build::new()
+        .file("src/std/prelude.c")
+        .compile("prelude");
 }

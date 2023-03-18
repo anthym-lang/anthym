@@ -1,7 +1,7 @@
 use crate::ast::{self, Expr, FnCall, FnDecl, Ident, If, Literal, Stmt, Var};
-use crate::builtins::{self, BUILTINS, BUILTINS_SRC};
 use crate::ice::IceExt;
 use crate::parse::parse_text;
+use crate::rustic_std::{self, PRELUDE, PRELUDE_SRC};
 use anyhow::{anyhow, bail, Result};
 pub use cranelift::prelude::settings::OptLevel;
 use cranelift::prelude::*;
@@ -79,8 +79,8 @@ impl Jit<JITModule, JitOptions> {
             .unwrap_or_ice();
         info!("adding builtin symbols");
         let mut builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
-        builder.symbol("print", builtins::print as *const u8);
-        builder.symbol("print_char", builtins::print_char as *const u8);
+        builder.symbol("print", rustic_std::print as *const u8);
+        builder.symbol("print_char", rustic_std::print_char as *const u8);
         let module = JITModule::new(builder);
         info!("ready to jit");
         Self {
@@ -171,10 +171,10 @@ impl Jit<ObjectModule, BuildOptions> {
                 .map_err(|err| anyhow!("{err}"))?;
         }
 
-        let file = File::create("./builtins.c")?;
+        let file = File::create("./prelude.c")?;
         {
             let mut writer = BufWriter::new(&file);
-            writer.write_all(BUILTINS_SRC)?;
+            writer.write_all(PRELUDE_SRC)?;
         }
 
         let host = Triple::host().to_string();
@@ -189,7 +189,7 @@ impl Jit<ObjectModule, BuildOptions> {
             .host(&host)
             .target(&self.options.target.to_string()) // TODO: allow for custom targets
             .debug(false)
-            .flag("./builtins.c")
+            .flag("./prelude.c")
             .flag(Self::try_path_to_str(&object_file)?)
             .try_get_compiler()?
             .to_command();
@@ -383,7 +383,7 @@ where
     }
 
     fn translate_call(&mut self, call: FnCall) -> Result<Value> {
-        let sig = if !BUILTINS.contains_key(&call.name) {
+        let sig = if !PRELUDE.contains_key(&call.name) {
             let func_or_data_id = self
                 .module
                 .get_name(&call.name.0)
@@ -399,7 +399,7 @@ where
             }
         } else {
             let mut sig = self.module.make_signature();
-            let rust_sig = BUILTINS.get(&call.name).unwrap_or_ice();
+            let rust_sig = PRELUDE.get(&call.name).unwrap_or_ice();
             for ty in rust_sig.0.iter() {
                 sig.params.push(AbiParam::new(ident_to_type(ty)?));
             }
