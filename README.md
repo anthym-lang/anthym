@@ -10,17 +10,31 @@ How to set up.
 
 ### Installation
 Clone the repository.
-```console
+```
 git clone https://github.com/Phil-Gates/rustic
 ```
 Then install with `cargo` (don't forget to `cd` into the directory first).
-```console
+```
 cargo install --path cli
 ```
-You now have the CLI installed! You can get help from running the CLI with the `--help` flag, like so:
-```console
-rustic --help
+Now write a file (you can call it `hello.rustic`)
+It will contain:
+```rust
+fn main() -> int {
+    print("Hello, World!")
+    return 0
+}
 ```
+You can run it, like so:
+```
+rustic run hello.rustic
+```
+Or, compile it:
+```
+rustic build hello.rustic -o hello
+```
+The built executable is in the `output/` directory
+
 
 ## Built With
 * [`cranelift`](https://lib.rs/cranelift/)
