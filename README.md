@@ -1,4 +1,4 @@
-# <insert lanugage name after I come up with it>
+# Rustic
 A toy language that can be ran with a JIT compiler, or with an AOT compiler. Uses the [`cranelift`](https://lib.rs/cranelift/) crate to generate object files and for JIT compilation. It uses a handwritten parser, but the lexer was generated with [`logos`](https://lib.rs/logos/).
 
 ## Getting Started
@@ -11,7 +11,7 @@ How to set up.
 ### Installation
 Clone the repository.
 ```bash
-git clone <repo url after name is finalized>
+git clone https://github.com/Phil-Gates/rustic
 ```
 Then install with `cargo`.
 ```bash
@@ -19,7 +19,7 @@ cargo install --path .
 ```
 You now have the CLI installed! You can get help from running the CLI with the `--help` flag, like so:
 ```bash
-<cli name after I come up the the language name> --help
+rustic --help
 ```
 
 ## Built With
