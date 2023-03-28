@@ -4,7 +4,7 @@ use logos::Logos;
 use std::fmt::Display;
 use std::ops::Range;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Token {
     pub(crate) token: TokenType,
     pub(crate) raw: String,
@@ -101,6 +101,9 @@ pub(crate) enum TokenType {
     #[token("/")]
     Slash,
 
+    #[token("!")]
+    Bang,
+
     #[token("->")]
     Arrow,
 
@@ -166,6 +169,7 @@ impl Display for TokenType {
                 Minus => "a minus sign (`-`)",
                 Asterisk => "an asterisk (`*`)",
                 Slash => "a forward slash (`/`)",
+                Bang => "an exclaimation mark (`!`)",
                 Arrow => "a left-pointing arrow (`->`)",
                 LParen => "a left parenthesis (`(`)",
                 RParen => "a right parenthesis (`)`)",

@@ -1,9 +1,9 @@
-use crate::ast::Ident;
+use crate::ast::{Ident, Type};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 lazy_static! {
-    pub(crate) static ref PRELUDE: HashMap<Ident, (Vec<Ident>, Ident)> = HashMap::from([
+    pub(crate) static ref PRELUDE: HashMap<Ident, (Vec<Type>, Type)> = HashMap::from([
         ("print_char".into(), (vec!["char".into()], "char".into())),
         ("print".into(), (vec!["string".into()], "string".into()))
     ]);

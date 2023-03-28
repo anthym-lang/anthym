@@ -1,5 +1,14 @@
 use std::fmt::Display;
 
+#[cold]
+pub(crate) fn ice(msg: &str) -> ! {
+    panic!(
+        "The compiler/interpreter panicked.
+Please file an issue to the github repository.
+The following information was provided: {msg}"
+    )
+}
+
 pub(crate) trait IceExt<T> {
     #[cold]
     fn unwrap_or_ice(self) -> T;

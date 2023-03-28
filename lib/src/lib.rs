@@ -12,6 +12,7 @@ pub mod fmt;
 mod ice;
 pub mod jit;
 mod lex;
+mod ops;
 mod parse;
 mod rustic_std;
 mod token;

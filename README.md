@@ -42,3 +42,6 @@ The built executable is in the `output/` directory
 
 ## License
 This project is licensed under the MIT license - please see the [LICENSE](LICENSE) file for more details.
+
+## Acknowledgements
+* Robert Nystrom and his book, [Crafting Interpreters](https://craftinginterpreters.com/)

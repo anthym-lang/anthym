@@ -2,13 +2,15 @@
 Emphasized = currently working on
 
 ## Features
- * Binary expressions
+ * **Binary expressions**
  * Static typing
  * More builtins
  * Test WASM-ness
  * Compile to bytecode
  * Optimize bytecode
- * **JIT / compile to binary & link with cranelift**
+ * JIT / compile to binary & link with cranelift
+   * Support else ifs
+ * Nicer standard library
 
 ## Refactors
 * Stop using anyhow, switch to thiserror

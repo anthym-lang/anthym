@@ -2,10 +2,10 @@ use crate::ast::*;
 use crate::error::{Error, ErrorKind, Result};
 use crate::expects::*;
 use crate::ice::IceExt;
-use crate::lex::lex;
+use crate::lex::Lexer;
 use crate::token::{Token, TokenType};
 use crate::unescape::unescape;
-use std::collections::VecDeque;
+use peekmore::{PeekMore, PeekMoreIterator};
 use std::iter::from_fn;
 
 macro_rules! ok_or_else {
@@ -17,6 +17,30 @@ macro_rules! ok_or_else {
     };
 }
 
+macro_rules! grammar {
+    {
+        $(
+            $rule:ident -> $inner:ident ( ( $token:ident $(| $tokens:ident)* ) $inner2:ident )* ;
+        )+
+    } => {
+        $(
+            fn $rule(&mut self) -> Result<Expr> {
+                let mut expr = self.$inner()?;
+
+                while self.current_is_token(TokenType::$token)
+                    $(.or(self.current_is_token(TokenType::$tokens)))*
+                    .unwrap_or(false) {
+                    let op = self.take_ice()?;
+                    let right = self.$inner()?;
+                    expr = Expr::Binary(expr.into(), Op::from_token(op), right.into());
+                }
+
+                Ok(expr)
+            }
+        )+
+    };
+}
+
 pub(crate) fn parse_text(source: impl AsRef<str>) -> anyhow::Result<Program> {
     let mut parser = Parser::new(source.as_ref())?;
     Ok(parser.program()?)
@@ -25,20 +49,23 @@ pub(crate) fn parse_text(source: impl AsRef<str>) -> anyhow::Result<Program> {
 #[derive(Debug)]
 struct Parser<'a> {
     source: &'a str,
-    tokens: VecDeque<Token>,
+    lexer: PeekMoreIterator<Lexer<'a>>,
+    current: Option<Token>,
 }
 
 impl<'a> Parser<'a> {
     pub(crate) fn new(source: &'a str) -> Result<Self> {
         Ok(Self {
             source,
-            tokens: lex(source)?.into(),
+            lexer: Lexer::new(source).peekmore(),
+            current: None,
         })
     }
 
     pub(crate) fn program(&mut self) -> Result<Program> {
         from_fn(|| {
-            if self.current().is_some() {
+            // if the current token is none, then we might be on the first token
+            if self.current().is_some() || self.peek().is_some() {
                 Some(self.fn_decl())
             } else {
                 None
@@ -48,7 +75,7 @@ impl<'a> Parser<'a> {
     }
 
     fn token(&mut self, token: TokenType) -> Result<Token> {
-        self.take()
+        self.take()?
             .ok_or_else(|| Error::eof(self.source, [token].into()))
             .and_then(|owned| {
                 if owned.token == token {
@@ -64,8 +91,34 @@ impl<'a> Parser<'a> {
             })
     }
 
+    fn type_(&mut self) -> Result<Type> {
+        let base = self.ident()?;
+        let mut generics = Vec::new();
+
+        if let Some(true) = self.current_is_token(TokenType::LessThan) {
+            self.take_ice()?;
+            loop {
+                generics.push(self.type_()?);
+                if self
+                    .current_is_token(TokenType::GreaterThan)
+                    .ok_or_else(|| {
+                        Error::eof(
+                            self.source,
+                            [TokenType::GreaterThan, TokenType::Comma].into(),
+                        )
+                    })?
+                {
+                    break;
+                }
+            }
+            self.token(TokenType::GreaterThan)?;
+        }
+
+        Ok(Type { base, generics })
+    }
+
     fn ident(&mut self) -> Result<Ident> {
-        self.take()
+        self.take()?
             .ok_or_else(|| Error::eof(self.source, IDENT.into()))
             .and_then(|owned| match owned.token {
                 TokenType::Ident => Ok(owned.raw.into()),
@@ -79,7 +132,7 @@ impl<'a> Parser<'a> {
     }
 
     fn literal(&mut self) -> Result<Literal> {
-        self.take()
+        self.take()?
             .ok_or_else(|| Error::eof(self.source, LITERAL.into()))
             .and_then(|owned| match owned.token {
                 TokenType::FloatLiteral => Ok(Literal::Float(owned.raw.parse().unwrap_or_ice())),
@@ -106,7 +159,7 @@ impl<'a> Parser<'a> {
         let mut args = Vec::new();
         loop {
             if self.current_is_token(TokenType::RParen).unwrap_or(false) {
-                self.take();
+                self.take_ice()?;
                 break Ok(FnCall { name, args });
             }
             args.push(self.expr()?);
@@ -124,20 +177,51 @@ impl<'a> Parser<'a> {
     }
 
     fn expr(&mut self) -> Result<Expr> {
+        self.equality()
+    }
+
+    grammar! {
+        equality -> comparison ( (Inequality | Equality) comparison )*;
+        comparison -> term ( (GreaterThan | GreaterThanEqualTo | LessThan | LessThanEqualTo) term )*;
+        term -> factor ( (Minus | Plus) factor )*;
+        factor -> unary ( (Slash | Asterisk) unary )*;
+    }
+
+    fn unary(&mut self) -> Result<Expr> {
+        if self
+            .current_is_token(TokenType::Bang)
+            .or(self.current_is_token(TokenType::Minus))
+            .unwrap_or(false)
+        {
+            let op = self.take_ice()?;
+            let right = self.unary()?;
+            Ok(Expr::Unary(Op::from_token(op), right.into()))
+        } else {
+            self.primary()
+        }
+    }
+
+    fn primary(&mut self) -> Result<Expr> {
         let current = self
             .current()
             .ok_or_else(|| Error::eof(self.source, EXPR.into()))?;
+
         match &current.token {
             literal if LITERAL.contains(literal) => self.literal().map(Expr::Literal),
-            TokenType::Ident => match self.peek(1) {
+            TokenType::Ident => match self.peek() {
                 Some(inner) => match inner.token {
                     TokenType::LParen => self.fn_call().map(Expr::FnCall),
                     _ => self.ident().map(Expr::Ident),
                 },
                 _ => self.ident().map(Expr::Ident),
             },
-            // SAFETY: we know the current token exists, because we are matching on it
-            _ => Err(unsafe { self.take_unchecked() }.into_error(
+            TokenType::LParen => {
+                self.take_ice()?;
+                let expr = self.expr();
+                self.token(TokenType::RParen)?;
+                expr
+            }
+            _ => Err(self.take_ice()?.into_error(
                 self.source,
                 ErrorKind::Expected {
                     expected: EXPR.into(),
@@ -157,7 +241,7 @@ impl<'a> Parser<'a> {
             }
             let arg = self.ident()?;
             self.token(TokenType::Colon)?;
-            let ty = self.ident()?;
+            let ty = self.type_()?;
             args.push((arg, ty));
             if !ok_or_else!(self.current_is_token(TokenType::RParen), {
                 opening.into_error(
@@ -172,7 +256,7 @@ impl<'a> Parser<'a> {
         }
         self.token(TokenType::RParen)?;
         self.token(TokenType::Arrow)?;
-        let ret = self.ident()?;
+        let ret = self.type_()?;
         let block = self.block()?;
 
         Ok(FnDecl {
@@ -189,19 +273,19 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| Error::eof(self.source, VAR.into()))?;
         match current.token {
             TokenType::KeywordLet => {
-                self.take();
+                self.take()?;
                 let name = self.ident()?;
                 self.token(TokenType::Colon)?;
-                let ty = self.ident()?;
+                let ty = self.type_()?;
                 self.token(TokenType::Equals)?;
                 let value = self.expr()?;
                 Ok(Var::Let(name, ty, value))
             }
             TokenType::KeywordMut => {
-                self.take();
+                self.take()?;
                 let name = self.ident()?;
                 self.token(TokenType::Colon)?;
-                let ty = self.ident()?;
+                let ty = self.type_()?;
                 self.token(TokenType::Equals)?;
                 let value = self.expr()?;
                 Ok(Var::Mut(name, ty, value))
@@ -212,8 +296,7 @@ impl<'a> Parser<'a> {
                 let value = self.expr()?;
                 Ok(Var::ReAssign(name, value))
             }
-            // SAFETY: we know the current token exists, because we are matching on it
-            _ => Err(unsafe { self.take_unchecked() }.into_error(
+            _ => Err(self.take_ice()?.into_error(
                 self.source,
                 ErrorKind::Expected {
                     expected: VAR.into(),
@@ -232,6 +315,7 @@ impl<'a> Parser<'a> {
                 .current_is_token(TokenType::KeywordIf)
                 .ok_or_else(|| Error::eof(self.source, IF_STMT.into()))?
             {
+                self.take_ice()?;
                 else_ifs.push((self.expr()?, self.block()?));
             } else {
                 break Ok(If {
@@ -249,20 +333,20 @@ impl<'a> Parser<'a> {
     }
 
     fn stmt(&mut self) -> Result<Stmt> {
-        match self
+        let current = self
             .current()
             .ok_or_else(|| Error::eof(self.source, STMT.into()))?
-            .token
-        {
+            .token;
+
+        match current {
             TokenType::KeywordIf => self.if_stmt().map(Stmt::If),
             TokenType::KeywordLet | TokenType::KeywordMut => self.var().map(Stmt::Var),
-            TokenType::Ident if self.peek_is_token(1, TokenType::Equals).unwrap_or(false) => {
+            TokenType::Ident if (self.peek_is_token(TokenType::Equals).unwrap_or(false)) => {
                 self.var().map(Stmt::Var)
             }
             TokenType::KeywordReturn => self.return_().map(Stmt::Return),
             other if EXPR.contains(&other) => self.expr().map(Stmt::Expr),
-            // SAFETY: we are matching on the current token, so it must exist
-            _ => Err(unsafe { self.take_unchecked() }.into_error(
+            _ => Err(self.take_ice()?.into_error(
                 self.source,
                 ErrorKind::Expected {
                     expected: STMT.into(),
@@ -288,29 +372,44 @@ impl<'a> Parser<'a> {
         Ok(Block(stmts))
     }
 
-    fn take(&mut self) -> Option<Token> {
-        self.tokens.pop_front()
+    fn take(&mut self) -> Result<Option<Token>> {
+        let owned = self
+            .lexer
+            .next()
+            .map(|token| {
+                if token.token == TokenType::Error {
+                    return Err(token.into_error(self.source, ErrorKind::Unknown));
+                }
+
+                Ok(token)
+            })
+            .transpose()?;
+        self.current = self.peek().cloned();
+        self.lexer.advance_cursor();
+
+        Ok(owned)
     }
 
-    unsafe fn take_unchecked(&mut self) -> Token {
-        // SAFETY: left up to the caller
-        unsafe { self.take().unwrap_unchecked() }
+    fn take_ice(&mut self) -> Result<Token> {
+        Ok(self
+            .take()?
+            .unwrap_or_ice_msg("the parser thought there was a token when there wasn't"))
     }
 
     fn current(&self) -> Option<&Token> {
-        self.tokens.get(0)
+        self.current.as_ref()
     }
 
     fn current_is_token(&self, token: TokenType) -> Option<bool> {
         self.current().map(|inner| inner.token == token)
     }
 
-    fn peek(&self, n: usize) -> Option<&Token> {
-        self.tokens.get(n)
+    fn peek(&mut self) -> Option<&Token> {
+        self.lexer.peek()
     }
 
-    fn peek_is_token(&self, n: usize, token: TokenType) -> Option<bool> {
-        self.peek(n).map(|inner| inner.token == token)
+    fn peek_is_token(&mut self, token: TokenType) -> Option<bool> {
+        self.peek().map(|inner| inner.token == token)
     }
 }
 

@@ -5,19 +5,31 @@ use std::fmt::Display;
 
 const INDENT_LEVEL: &str = "    ";
 
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let generics = self
+            .generics
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        write!(f, "{}", self.base,)?;
+        if !generics.is_empty() {
+            write!(f, "{}", generics.join(", "))?;
+        }
+
+        Ok(())
+    }
+}
+
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Literal::Str(s) => format!(r#""{}""#, s.escape_default()),
-                Literal::Char(ch) => format!("'{}'", ch.escape_default()),
-                Literal::Bool(bool) => format!("{bool}"),
-                Literal::Int(num) => format!("{num}"),
-                Literal::Float(float) => format!("{float}"),
-            }
-        )
+        match self {
+            Literal::Str(s) => write!(f, r#""{}""#, s.escape_default()),
+            Literal::Char(ch) => write!(f, "'{}'", ch.escape_default()),
+            Literal::Bool(bool) => write!(f, "{bool}"),
+            Literal::Int(num) => write!(f, "{num}"),
+            Literal::Float(float) => write!(f, "{float}"),
+        }
     }
 }
 
@@ -84,6 +96,25 @@ impl Display for FnCall {
     }
 }
 
+impl Display for Op {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Op::Eq => write!(f, "=="),
+            Op::Ne => write!(f, "!="),
+            Op::Lt => write!(f, "<"),
+            Op::Lte => write!(f, "<="),
+            Op::Gt => write!(f, ">"),
+            Op::Gte => write!(f, ">="),
+            Op::Add => write!(f, "+"),
+            Op::Sub => write!(f, "-"),
+            Op::Div => write!(f, "/"),
+            Op::Mul => write!(f, "*"),
+            Op::Not => write!(f, "!"),
+        }
+    }
+}
+
+// FIXME: strange stuff probably happens with formatting expressions in parenthesis
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -93,6 +124,8 @@ impl Display for Expr {
                 Expr::Literal(lit) => lit.to_string(),
                 Expr::Ident(id) => id.to_string(),
                 Expr::FnCall(call) => call.to_string(),
+                Expr::Binary(left, op, right) => format!("{left} {op} {right}"),
+                Expr::Unary(op, expr) => format!("{op}{expr}"),
             }
         )
     }
@@ -172,7 +205,7 @@ mod test {
         let program_ugly = "fn a(  
 
 )-> nothing{
-    mut x=   1
+    mut x:int=   1
 x   =2
 
 
@@ -181,7 +214,7 @@ x   =2
     ";
         let program = "
 fn a() -> nothing {
-    mut x = 1
+    mut x: int = 1
     x = 2
 }";
         let formatted = format_text(program_ugly);
@@ -196,7 +229,7 @@ fn a() -> nothing {
         let program_ugly = "fn a(  
 
 )-> nothing{
-    mut x=   1
+    mut x:int=   1
 x   =2
 
 

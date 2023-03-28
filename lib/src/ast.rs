@@ -1,4 +1,34 @@
-use std::{borrow::Cow, iter::FromIterator};
+use crate::ice::ice;
+use crate::token::{Token, TokenType};
+use std::borrow::Cow;
+use std::iter::FromIterator;
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Type {
+    pub(crate) base: Ident,
+    pub(crate) generics: Vec<Type>,
+}
+
+// FIXME: these from impls do not validate their input
+impl From<&str> for Type {
+    fn from(value: &str) -> Self {
+        if let Some((base, generics)) = value.split_once('<') {
+            let generics = &generics[..generics.len() - 1];
+            Self {
+                base: base.into(),
+                generics: generics
+                    .split(',')
+                    .map(|generic| generic.trim().into())
+                    .collect(),
+            }
+        } else {
+            Self {
+                base: value.into(),
+                generics: Vec::new(),
+            }
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Literal {
@@ -31,24 +61,60 @@ pub(crate) struct FnCall {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Op {
+    Eq,
+    Ne,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    Add,
+    Sub,
+    Div,
+    Mul,
+    Not,
+}
+
+impl Op {
+    pub(crate) fn from_token(value: Token) -> Self {
+        match value.token {
+            TokenType::Equality => Self::Eq,
+            TokenType::Inequality => Self::Ne,
+            TokenType::LessThan => Self::Lt,
+            TokenType::LessThanEqualTo => Self::Lte,
+            TokenType::GreaterThan => Self::Gt,
+            TokenType::GreaterThanEqualTo => Self::Gte,
+            TokenType::Plus => Self::Add,
+            TokenType::Minus => Self::Sub,
+            TokenType::Slash => Self::Div,
+            TokenType::Asterisk => Self::Mul,
+            TokenType::Bang => Self::Not,
+            other => ice(format!("invalid op: {other}").as_str()),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Expr {
     Literal(Literal),
     FnCall(FnCall),
     Ident(Ident),
+    Binary(Box<Expr>, Op, Box<Expr>),
+    Unary(Op, Box<Expr>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct FnDecl {
     pub(crate) name: Ident,
-    pub(crate) args: Vec<(Ident, Ident)>,
-    pub(crate) ret: Ident,
+    pub(crate) args: Vec<(Ident, Type)>,
+    pub(crate) ret: Type,
     pub(crate) block: Block,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Var {
-    Let(Ident, Ident, Expr),
-    Mut(Ident, Ident, Expr),
+    Let(Ident, Type, Expr),
+    Mut(Ident, Type, Expr),
     ReAssign(Ident, Expr),
 }
 

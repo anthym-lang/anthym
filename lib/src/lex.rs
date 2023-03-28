@@ -1,23 +1,31 @@
-use crate::error::{ErrorKind, Result};
 use crate::token::{Token, TokenType};
 use logos::Logos;
 
-pub(crate) fn lex(input: &str) -> Result<Vec<Token>> {
-    let mut tokens = Vec::new();
-    let mut lexer = TokenType::lexer(input);
-    while let Some(token) = lexer.next() {
-        let spanned = Token {
-            token,
-            raw: lexer.slice().into(),
-            span: lexer.span(),
-        };
+#[derive(Debug)]
+pub(crate) struct Lexer<'a> {
+    inner: logos::Lexer<'a, TokenType>,
+}
 
-        if spanned.token == TokenType::Error {
-            return Err(spanned.into_error(input, ErrorKind::Unknown));
+impl<'a> Lexer<'a> {
+    pub(crate) fn new(source: &'a str) -> Self {
+        Self {
+            inner: TokenType::lexer(source),
         }
-
-        tokens.push(spanned);
     }
+}
 
-    Ok(tokens)
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let tt = self.inner.next()?;
+        let slice = self.inner.slice();
+        let span = self.inner.span();
+
+        Some(Token {
+            token: tt,
+            raw: slice.into(),
+            span,
+        })
+    }
 }
