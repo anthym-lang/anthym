@@ -11,6 +11,7 @@ Emphasized = currently working on
  * JIT / compile to binary & link with cranelift
    * Support else ifs
  * Nicer standard library
+ * **Write docs and more tests, and start writing book**
 
 ## Refactors
 * Stop using anyhow, switch to thiserror
