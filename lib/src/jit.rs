@@ -2,7 +2,7 @@ use crate::ast::{self, Expr, FnCall, FnDecl, Ident, If, Literal, Stmt, Var};
 use crate::ice::IceExt;
 use crate::ops::*;
 use crate::parse::parse_text;
-use crate::rustic_std::{self, PRELUDE, PRELUDE_SRC};
+use crate::stdlib::{self, PRELUDE, PRELUDE_SRC};
 use anyhow::{anyhow, bail, Result};
 pub use cranelift::prelude::settings::OptLevel;
 use cranelift::prelude::*;
@@ -83,8 +83,8 @@ impl Jit<JITModule, JitOptions> {
             .unwrap_or_ice();
         info!("adding builtin symbols");
         let mut builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
-        builder.symbol("print", rustic_std::print as *const u8);
-        builder.symbol("print_char", rustic_std::print_char as *const u8);
+        builder.symbol("print", stdlib::print as *const u8);
+        builder.symbol("print_char", stdlib::print_char as *const u8);
         let module = JITModule::new(builder);
         info!("ready to jit");
         Self {
@@ -404,8 +404,12 @@ where
         op: ArithmeticOp,
         right: TypedValue,
     ) -> Result<TypedValue> {
-        if left.1 == right.1 {
-            bail!("cannot do arithmetic on different types")
+        if left.1 != right.1 {
+            bail!(
+                "cannot do arithmetic on different types ({} and {})",
+                left.1,
+                right.1
+            )
         }
         let ty = left.1;
         let result = match &*ty.base.0 {

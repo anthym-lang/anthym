@@ -9,7 +9,7 @@ lazy_static! {
     ]);
 }
 
-pub(crate) const PRELUDE_SRC: &[u8] = include_bytes!("std/prelude.c");
+pub(crate) const PRELUDE_SRC: &[u8] = include_bytes!("prelude.c");
 
 extern "C" {
     pub(crate) fn print(value: *const i8) -> *const i8;

@@ -2,7 +2,8 @@
 Emphasized = currently working on
 
 ## Features
- * **Binary expressions**
+ * Arrays
+ * **Operations on arrays and strings**
  * Static typing
  * More builtins
  * Test WASM-ness

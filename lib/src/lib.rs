@@ -14,7 +14,7 @@ pub mod jit;
 mod lex;
 mod ops;
 mod parse;
-mod rustic_std;
+mod stdlib;
 mod token;
 mod unescape;
 

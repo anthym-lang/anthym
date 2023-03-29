@@ -27,9 +27,7 @@ macro_rules! grammar {
             fn $rule(&mut self) -> Result<Expr> {
                 let mut expr = self.$inner()?;
 
-                while self.current_is_token(TokenType::$token)
-                    $(.or(self.current_is_token(TokenType::$tokens)))*
-                    .unwrap_or(false) {
+                while self.current_is_token(TokenType::$token).unwrap_or(false) $(|| self.current_is_token(TokenType::$tokens).unwrap_or(false))* {
                     let op = self.take_ice()?;
                     let right = self.$inner()?;
                     expr = Expr::Binary(expr.into(), Op::from_token(op), right.into());
