@@ -1,5 +1,5 @@
-# Rustic
-A toy language that can be ran with a JIT compiler, or with an AOT compiler. Uses the [`cranelift`](https://lib.rs/cranelift/) crate to generate object files and for JIT compilation. It uses a handwritten parser, but the lexer was generated with [`logos`](https://lib.rs/logos/).
+# Anthym
+A programming language that can be ran with a JIT compiler, or with an AOT compiler. Uses the [`cranelift`](https://lib.rs/cranelift/) crate to generate object files and for JIT compilation. It uses a handwritten parser, but the lexer was generated with [`logos`](https://lib.rs/logos/).
 
 ## Getting Started
 How to set up.
@@ -11,26 +11,26 @@ How to set up.
 ### Installation
 Clone the repository:
 ```
-git clone https://github.com/Phil-Gates/rustic
+git clone https://github.com/anthym-lang/anthym.git
 ```
 Then install with `cargo` (don't forget to `cd` into the directory first):
 ```
 cargo install --path cli
 ```
-Now create a file called `hello.rustic`. It will contaian the following:
+Now create a file called `hello.an`. It will contaian the following:
 ```rust
 fn main() -> int {
     print("Hello, World!")
     return 0
 }
 ```
-You can run it, like so:
+You can run it with the JIT compiler, like so:
 ```
-rustic run hello.rustic
+anthym run hello.an
 ```
 Or, compile it:
 ```
-rustic build hello.rustic -o hello
+anthym build hello.an -o hello
 ```
 The built executable is in the `output/` directory
 
